@@ -96,6 +96,11 @@ class FunscriptPlayer:
 
                 await self._tcode.send(values, interval_ms)
 
+                # Log values every 2 seconds for debugging
+                if current_ms % 2000 < interval_ms:
+                    parts = [f"{a}={values[a]:.2f}" for a in AXES if a in values]
+                    self._on_log(f"t={current_ms/1000:.0f}s {' '.join(parts)}")
+
                 # Precise sleep: account for processing time
                 elapsed_tick = time.monotonic() - tick_start
                 sleep_s = max(0, (interval_ms / 1000.0) - elapsed_tick)

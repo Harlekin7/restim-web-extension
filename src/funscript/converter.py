@@ -32,6 +32,11 @@ class ConvertSettings:
         self.boost_window = 0.5         # Sekunden: kurzes Fenster fuer Burst-Erkennung
         self.boost_strength = 1.0       # Staerke des Boost-Effekts (0-3)
 
+        # Position → Pulse Freq Einfluss
+        # 0 = Pulse Freq rein speed-basiert (bisher), 1 = Pulse Freq folgt der Position
+        self.position_freq_influence = 0.0
+        self.position_freq_invert = False
+
         # Volume smoothing + fade
         self.volume_window = 3.0        # Sekunden: separates Glaettungsfenster fuer Volume
         self.volume_fade_down = 1.0     # Sekunden bis Volume auf min faded
@@ -157,7 +162,9 @@ def convert_funscript(funscript_data, settings=None):
         vol_target = lerp(effective_spd, settings.volume_min, settings.volume_max)
         vol = lerp(volume_envelope, settings.volume_min, vol_target)
         car = lerp(effective_spd, settings.carrier_freq_min, settings.carrier_freq_max)
-        pfr = lerp(effective_spd, settings.pulse_freq_min, settings.pulse_freq_max)
+        pfr_speed = lerp(effective_spd, settings.pulse_freq_min, settings.pulse_freq_max)
+        pfr_pos = (1.0 - pos) if settings.position_freq_invert else pos
+        pfr = lerp(settings.position_freq_influence, pfr_speed, pfr_pos)
         pwi = lerp(effective_spd, settings.pulse_width_min, settings.pulse_width_max)
         pri = lerp(effective_spd, settings.pulse_rise_min, settings.pulse_rise_max)
 

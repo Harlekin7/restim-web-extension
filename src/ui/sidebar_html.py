@@ -137,9 +137,43 @@ SIDEBAR_HTML = """<!DOCTYPE html>
     }
     .log-time { color: #666; }
     .section-sep { border-top: 1px solid #3e3e3e; margin: 6px 0; }
+
+    /* Site switcher */
+    .site-switcher {
+        display: flex;
+        gap: 4px;
+    }
+    .site-btn {
+        flex: 1;
+        background: #2d2d2d;
+        border: 1px solid #3e3e3e;
+        border-radius: 4px;
+        color: #888;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 6px 10px;
+        cursor: pointer;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .site-btn.active {
+        background: #5a8;
+        border-color: #6b9;
+        color: #fff;
+    }
+    .site-btn:not(.active):hover { background: #3a3a3a; color: #ccc; }
 </style>
 </head>
 <body>
+
+<!-- Site switcher -->
+<div class="group">
+    <div class="group-title">Website</div>
+    <div class="site-switcher">
+        <button class="site-btn" data-site="faptap">FapTap</button>
+        <button class="site-btn" data-site="theedgy">TheEdgy</button>
+    </div>
+</div>
 
 <!-- Server -->
 <div class="group">
@@ -147,6 +181,21 @@ SIDEBAR_HTML = """<!DOCTYPE html>
     <div class="status-line">
         <span class="dot" id="server-dot"></span>
         <span class="value" id="server-status">Wird gestartet...</span>
+    </div>
+</div>
+
+<!-- TheEdgy live settings (only visible on theedgy) -->
+<div class="group" id="group-theedgy" style="display:none;">
+    <div class="group-title">TheEdgy Live</div>
+    <div class="param-row">
+        <span class="param-label">Max Speed</span>
+        <input type="number" class="param-input" id="s-max-speed" min="0" max="10000" step="10" value="330">
+        <span class="param-val">%/s</span>
+    </div>
+    <div class="param-row">
+        <span class="param-label">Min Speed</span>
+        <input type="number" class="param-input" id="s-min-speed" min="0" max="10000" step="5" value="32">
+        <span class="param-val">%/s</span>
     </div>
 </div>
 
@@ -243,6 +292,16 @@ SIDEBAR_HTML = """<!DOCTYPE html>
         <input type="range" class="param-range" id="s-boost-win" min="0.1" max="2.0" step="0.1" value="0.5">
         <span class="param-val" id="v-boost-win">0.5s</span>
     </div>
+
+    <div class="section-sep"></div>
+
+    <!-- Position → Pulse Freq -->
+    <div class="param-row">
+        <span class="param-label">Pos Freq</span>
+        <input type="range" class="param-range" id="s-pos-freq" min="0" max="1" step="0.05" value="0">
+        <span class="param-val" id="v-pos-freq">0.00</span>
+        <button class="toggle-btn" id="btn-pos-freq-inv" title="Position invertieren">Inv</button>
+    </div>
 </div>
 
 <!-- ════════ PULSE SETTINGS ════════ -->
@@ -263,44 +322,44 @@ SIDEBAR_HTML = """<!DOCTYPE html>
 
     <div class="section-sep"></div>
 
-    <!-- Pulse Freq: 0-1 → 0-100 Hz in Restim -->
+    <!-- Pulse Freq -->
     <div class="param-row">
         <span class="param-label">PulseF Min</span>
         <input type="range" class="param-range" id="s-pf-min" min="0" max="0.8" step="0.05" value="0.3">
-        <span class="param-val" id="v-pf-min">30 Hz</span>
+        <span class="param-val" id="v-pf-min">0.30</span>
     </div>
     <div class="param-row">
         <span class="param-label">PulseF Max</span>
         <input type="range" class="param-range" id="s-pf-max" min="0.2" max="1.0" step="0.05" value="0.9">
-        <span class="param-val" id="v-pf-max">90 Hz</span>
+        <span class="param-val" id="v-pf-max">0.90</span>
     </div>
 
     <div class="section-sep"></div>
 
-    <!-- Pulse Width: 0-1 → 4-10 Zyklen in Restim -->
+    <!-- Pulse Width -->
     <div class="param-row">
         <span class="param-label">PulseW Min</span>
         <input type="range" class="param-range" id="s-pw-min" min="0" max="0.5" step="0.05" value="0.1">
-        <span class="param-val" id="v-pw-min">4.6 cyc</span>
+        <span class="param-val" id="v-pw-min">0.10</span>
     </div>
     <div class="param-row">
         <span class="param-label">PulseW Max</span>
         <input type="range" class="param-range" id="s-pw-max" min="0.1" max="1.0" step="0.05" value="0.5">
-        <span class="param-val" id="v-pw-max">7.0 cyc</span>
+        <span class="param-val" id="v-pw-max">0.50</span>
     </div>
 
     <div class="section-sep"></div>
 
-    <!-- Pulse Rise Time: 0-1 → 2-20 Zyklen in Restim -->
+    <!-- Pulse Rise Time -->
     <div class="param-row">
         <span class="param-label">Rise Min</span>
         <input type="range" class="param-range" id="s-pr-min" min="0" max="0.5" step="0.05" value="0.0">
-        <span class="param-val" id="v-pr-min">2.0 cyc</span>
+        <span class="param-val" id="v-pr-min">0.00</span>
     </div>
     <div class="param-row">
         <span class="param-label">Rise Max</span>
         <input type="range" class="param-range" id="s-pr-max" min="0.1" max="1.0" step="0.05" value="0.8">
-        <span class="param-val" id="v-pr-max">16.4 cyc</span>
+        <span class="param-val" id="v-pr-max">0.80</span>
     </div>
 </div>
 
@@ -329,6 +388,13 @@ SIDEBAR_HTML = """<!DOCTYPE html>
         notifySettingsChanged();
     });
 
+    var posFreqInverted = false;
+    document.getElementById('btn-pos-freq-inv').addEventListener('click', function() {
+        posFreqInverted = !posFreqInverted;
+        this.className = 'toggle-btn' + (posFreqInverted ? ' active' : '');
+        notifySettingsChanged();
+    });
+
     // ── Slider wiring ─────────────────────────────────────────
     var sliders = {
         's-arc':       { val: 'v-arc',       fmt: function(v){ return Math.round(v); } },
@@ -339,12 +405,13 @@ SIDEBAR_HTML = """<!DOCTYPE html>
         's-vol-win':   { val: 'v-vol-win',   fmt: function(v){ return parseFloat(v).toFixed(1)+'s'; } },
         's-car-min':   { val: 'v-car-min',   fmt: function(v){ return parseFloat(v).toFixed(2); } },
         's-car-max':   { val: 'v-car-max',   fmt: function(v){ return parseFloat(v).toFixed(2); } },
-        's-pf-min':    { val: 'v-pf-min',    fmt: function(v){ return Math.round(parseFloat(v)*100)+' Hz'; } },
-        's-pf-max':    { val: 'v-pf-max',    fmt: function(v){ return Math.round(parseFloat(v)*100)+' Hz'; } },
-        's-pw-min':    { val: 'v-pw-min',    fmt: function(v){ return (4+parseFloat(v)*6).toFixed(1)+' cyc'; } },
-        's-pw-max':    { val: 'v-pw-max',    fmt: function(v){ return (4+parseFloat(v)*6).toFixed(1)+' cyc'; } },
-        's-pr-min':    { val: 'v-pr-min',    fmt: function(v){ return (2+parseFloat(v)*18).toFixed(1)+' cyc'; } },
-        's-pr-max':    { val: 'v-pr-max',    fmt: function(v){ return (2+parseFloat(v)*18).toFixed(1)+' cyc'; } }
+        's-pf-min':    { val: 'v-pf-min',    fmt: function(v){ return parseFloat(v).toFixed(2); } },
+        's-pf-max':    { val: 'v-pf-max',    fmt: function(v){ return parseFloat(v).toFixed(2); } },
+        's-pw-min':    { val: 'v-pw-min',    fmt: function(v){ return parseFloat(v).toFixed(2); } },
+        's-pw-max':    { val: 'v-pw-max',    fmt: function(v){ return parseFloat(v).toFixed(2); } },
+        's-pr-min':    { val: 'v-pr-min',    fmt: function(v){ return parseFloat(v).toFixed(2); } },
+        's-pr-max':    { val: 'v-pr-max',    fmt: function(v){ return parseFloat(v).toFixed(2); } },
+        's-pos-freq':  { val: 'v-pos-freq',  fmt: function(v){ return parseFloat(v).toFixed(2); } }
     };
 
     Object.keys(sliders).forEach(function(id) {
@@ -357,12 +424,36 @@ SIDEBAR_HTML = """<!DOCTYPE html>
     });
 
     // ── Number input wiring ───────────────────────────────────
-    var inputs = ['s-speed-win', 's-vol-min', 's-vol-max', 's-fade-down', 's-fade-up'];
+    var inputs = ['s-speed-win', 's-vol-min', 's-vol-max', 's-fade-down', 's-fade-up',
+                  's-max-speed', 's-min-speed'];
     inputs.forEach(function(id) {
         document.getElementById(id).addEventListener('change', function() {
             notifySettingsChanged();
         });
     });
+
+    // ── Site switcher ─────────────────────────────────────────
+    var currentSite = 'faptap';
+    document.querySelectorAll('.site-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var site = btn.getAttribute('data-site');
+            if (site === currentSite) return;
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.set_site) {
+                window.pywebview.api.set_site(site).then(function(ok) {
+                    if (ok) setActiveSite(site);
+                });
+            }
+        });
+    });
+
+    function setActiveSite(site) {
+        currentSite = site;
+        document.querySelectorAll('.site-btn').forEach(function(b) {
+            b.classList.toggle('active', b.getAttribute('data-site') === site);
+        });
+        document.getElementById('group-theedgy').style.display =
+            (site === 'theedgy') ? 'block' : 'none';
+    }
 
     // ── Collect all settings ──────────────────────────────────
     function getSettings() {
@@ -387,7 +478,11 @@ SIDEBAR_HTML = """<!DOCTYPE html>
             pulse_width_min:  parseFloat(document.getElementById('s-pw-min').value),
             pulse_width_max:  parseFloat(document.getElementById('s-pw-max').value),
             pulse_rise_min:   parseFloat(document.getElementById('s-pr-min').value),
-            pulse_rise_max:   parseFloat(document.getElementById('s-pr-max').value)
+            pulse_rise_max:   parseFloat(document.getElementById('s-pr-max').value),
+            max_speed_pct:    parseFloat(document.getElementById('s-max-speed').value),
+            min_speed_pct:    parseFloat(document.getElementById('s-min-speed').value),
+            position_freq_influence: parseFloat(document.getElementById('s-pos-freq').value),
+            position_freq_invert:    posFreqInverted
         };
     }
 
@@ -419,7 +514,11 @@ SIDEBAR_HTML = """<!DOCTYPE html>
         pulse_width_min:  { id: 's-pw-min',    type: 'slider' },
         pulse_width_max:  { id: 's-pw-max',    type: 'slider' },
         pulse_rise_min:   { id: 's-pr-min',    type: 'slider' },
-        pulse_rise_max:   { id: 's-pr-max',    type: 'slider' }
+        pulse_rise_max:   { id: 's-pr-max',    type: 'slider' },
+        max_speed_pct:    { id: 's-max-speed', type: 'input' },
+        min_speed_pct:    { id: 's-min-speed', type: 'input' },
+        position_freq_influence: { id: 's-pos-freq',       type: 'slider' },
+        position_freq_invert:    { id: 'btn-pos-freq-inv', type: 'pos-freq-toggle' }
     };
 
     function applySettings(data) {
@@ -437,6 +536,10 @@ SIDEBAR_HTML = """<!DOCTYPE html>
                 btn.textContent = boostEnabled ? 'An' : 'Aus';
                 document.getElementById('boost-settings').style.display = boostEnabled ? 'flex' : 'none';
                 document.getElementById('boost-settings2').style.display = boostEnabled ? 'flex' : 'none';
+            } else if (m.type === 'pos-freq-toggle') {
+                posFreqInverted = !!data[key];
+                document.getElementById(m.id).className =
+                    'toggle-btn' + (posFreqInverted ? ' active' : '');
             } else {
                 var el = document.getElementById(m.id);
                 el.value = data[key];

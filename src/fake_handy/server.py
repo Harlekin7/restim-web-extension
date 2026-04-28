@@ -105,8 +105,12 @@ class FakeHandyServer:
         app.router.add_put(f"{base}/hdsp/xava", self._handle_hdsp_xava)
         app.router.add_put(f"{base}/hdsp/xat", self._handle_hdsp_xat)
 
-        # Catch-all for unknown endpoints
+        # Catch-all for unknown v2 endpoints
         app.router.add_route("*", f"{base}/{{path:.*}}", self._handle_fallback)
+
+        # v3 API (theedgy.app) — observation mode: log everything, respond plausibly
+        for v3_base in ("/api/handy-rest/v3", "/api/handy/v3"):
+            app.router.add_route("*", f"{v3_base}/{{path:.*}}", self._handle_v3)
 
     # ── CORS Middleware ────────────────────────────────────────────
 
@@ -309,6 +313,56 @@ class FakeHandyServer:
         self._log(f"Unbekannter Endpunkt: {request.method} /{path}")
         return web.json_response({"result": 0})
 
+    # ── v3 (observation mode) ──────────────────────────────────────
+
+    async def _handle_v3(self, request):
+        """Catch-all v3 handler: log everything, return plausible responses.
+
+        Used to observe theedgy.app's API usage — once we know the exact
+        endpoints and payloads, specific handlers replace this.
+        """
+        path = request.match_info.get("path", "")
+        body_text = ""
+        try:
+            raw = await request.read()
+            if raw:
+                body_text = raw.decode("utf-8", errors="replace")
+        except Exception:
+            pass
+
+        log_msg = f"v3 {request.method} /{path}"
+        if body_text:
+            log_msg += f"  body={body_text[:200]}"
+        self._log(log_msg)
+
+        # Minimal responses so theedgy keeps talking to us.
+        suffix = path.rstrip("/").split("/")[-1] if path else ""
+
+        if suffix == "info":
+            return web.json_response({
+                "fwVersion": "4.0.0",
+                "fwStatus": "up_to_date",
+                "hwVersion": 3,
+                "model": "handy",
+                "branch": "master",
+                "sessionId": "restim-ext-v3-0001",
+                "connected": True,
+            })
+        if suffix == "connected":
+            return web.json_response({"connected": True})
+        if suffix == "status":
+            return web.json_response({"mode": self._mode, "state": self._hssp_state})
+        if suffix == "mode":
+            if request.method == "GET":
+                return web.json_response({"mode": self._mode})
+            return web.json_response({"result": 0})
+        if suffix == "time":
+            return web.json_response({"time": self._server_time_ms()})
+        if suffix == "servertime":
+            return web.json_response({"serverTime": self._server_time_ms()})
+
+        return web.json_response({})
+
     # ── Script Download ────────────────────────────────────────────
 
     async def _download_script(self, url):
@@ -378,6 +432,10 @@ class FakeHandyServer:
             s.boost_strength = float(data["boost_strength"])
         if "boost_window" in data:
             s.boost_window = float(data["boost_window"])
+        if "position_freq_influence" in data:
+            s.position_freq_influence = float(data["position_freq_influence"])
+        if "position_freq_invert" in data:
+            s.position_freq_invert = bool(data["position_freq_invert"])
 
         # Re-convert if we have a loaded funscript
         if self._funscript_data:
@@ -386,4 +444,5 @@ class FakeHandyServer:
     # ── Logging ────────────────────────────────────────────────────
 
     def _log(self, msg):
+        print(f"[fake-handy] {msg}", flush=True)
         self._on_log(msg)
