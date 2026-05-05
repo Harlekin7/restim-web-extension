@@ -48,7 +48,7 @@ class FakeHandyServer:
             asyncio.set_event_loop(self._loop)
             self._loop.run_until_complete(self._serve())
         except Exception as e:
-            self._log(f"Server-Fehler: {e}")
+            self._log(f"Server error: {e}")
 
     async def _serve(self):
         app = web.Application(middlewares=[self._cors_middleware])
@@ -58,7 +58,7 @@ class FakeHandyServer:
         await runner.setup()
         site = web.TCPSite(runner, self.host, self.port)
         await site.start()
-        self._log(f"Fake Handy Server laeuft auf {self.host}:{self.port}")
+        self._log(f"Fake Handy Server running on {self.host}:{self.port}")
 
         # Run forever
         await asyncio.Event().wait()
@@ -135,11 +135,11 @@ class FakeHandyServer:
 
     async def _handle_connected(self, request):
         key = request.headers.get("X-Connection-Key", "?")
-        self._log(f"Verbindung geprueft (Key: {key})")
+        self._log(f"Connection check (key: {key})")
         return web.json_response({"connected": True})
 
     async def _handle_info(self, request):
-        self._log("Geraete-Info abgefragt")
+        self._log("Device info requested")
         return web.json_response({
             "fwVersion": "3.2.3",
             "fwStatus": 0,
@@ -168,7 +168,7 @@ class FakeHandyServer:
         data = await request.json()
         self._mode = data.get("mode", 0)
         mode_names = {0: "HAMP", 1: "HSSP", 2: "HDSP", 3: "MAINTENANCE"}
-        self._log(f"Modus gesetzt: {mode_names.get(self._mode, self._mode)}")
+        self._log(f"Mode set: {mode_names.get(self._mode, self._mode)}")
         return web.json_response({"result": 0})
 
     # ── HSSP Handlers ──────────────────────────────────────────────
@@ -190,8 +190,8 @@ class FakeHandyServer:
             duration_s = duration_ms / 1000
             mins, secs = divmod(int(duration_s), 60)
             self._log(
-                f"Funscript empfangen! {action_count} Aktionen, "
-                f"Dauer: {mins}:{secs:02d}"
+                f"Funscript received! {action_count} actions, "
+                f"duration: {mins}:{secs:02d}"
             )
             self._on_funscript(script_data)
 
@@ -201,7 +201,7 @@ class FakeHandyServer:
             self._hssp_state = 3  # STOPPED (ready)
             return web.json_response({"result": 1})  # DOWNLOADED
         else:
-            self._log("Funscript-Download fehlgeschlagen!")
+            self._log("Funscript download failed!")
             self._hssp_state = 2  # NEED_SETUP
             return web.json_response({"result": -1})
 
@@ -310,7 +310,7 @@ class FakeHandyServer:
 
     async def _handle_fallback(self, request):
         path = request.match_info.get("path", "")
-        self._log(f"Unbekannter Endpunkt: {request.method} /{path}")
+        self._log(f"Unknown endpoint: {request.method} /{path}")
         return web.json_response({"result": 0})
 
     # ── v3 (observation mode) ──────────────────────────────────────
@@ -367,17 +367,17 @@ class FakeHandyServer:
 
     async def _download_script(self, url):
         """Download and parse a funscript from the given URL."""
-        self._log(f"Lade Script herunter: {url[:80]}...")
+        self._log(f"Downloading script: {url[:80]}...")
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
                     if resp.status != 200:
-                        self._log(f"Download fehlgeschlagen: HTTP {resp.status}")
+                        self._log(f"Download failed: HTTP {resp.status}")
                         return None
                     content = await resp.text()
                     return self._parse_script(content)
         except Exception as e:
-            self._log(f"Download-Fehler: {e}")
+            self._log(f"Download error: {e}")
             return None
 
     def _parse_script(self, content):

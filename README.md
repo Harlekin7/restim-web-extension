@@ -5,12 +5,21 @@ Bridge between web-based interactive media platforms and [Restim](https://github
 **Supported sites (v1.0):**
 - [FapTap.net](https://faptap.net) — funscript-based playback (via Handy API impersonation)
 - [TheEdgy.app](https://theedgy.app) — live T-Code streaming (via WebSerial impersonation)
+- **Network proxy** — serves FapTap or [SexLikeReal.com](https://www.sexlikereal.com) to other devices on the LAN (phones, tablets, VR headsets) without any client-side cert/DNS setup
 
-A switcher in the sidebar toggles between sites at runtime — no restart required.
+A switcher in the sidebar toggles between modes at runtime — no restart required.
+
+## Modes at a glance
+
+| Mode | What it does | Where you browse |
+|------|---|---|
+| **FapTap** | Embedded browser loads FapTap. JS bridge intercepts the Handy API. | In the app's browser window |
+| **TheEdgy** | Embedded browser loads TheEdgy. Fake `navigator.serial` answers as a TCode device. | In the app's browser window |
+| **Network** | Reverse proxy serves FapTap or SLR through your PC. Handy API still impersonated. | On any LAN device — `http://<your-pc-ip>:8080` |
 
 ## How it works
 
-There are two independent data paths, one per supported site, sharing the same downstream conversion + Restim WebSocket plumbing.
+Three independent data paths share the same downstream conversion + Restim WebSocket plumbing.
 
 ### Path A — FapTap (funscript)
 
@@ -30,9 +39,7 @@ There are two independent data paths, one per supported site, sharing the same d
                               ws://localhost:12346/tcode  →  Restim
 ```
 
-1. `redirect.js` patches `fetch()` and `XMLHttpRequest` so every call to `handyfeeling.com` is routed through `pywebview.api.handy_call()` (a JS bridge — bypasses Content-Security-Policy restrictions of modern sites).
-2. The fake server impersonates The Handy cloud API (v2 + v3). When FapTap calls `PUT /hssp/setup`, the server downloads the funscript URL and pre-processes the entire script into all 7 TCode axes.
-3. On `PUT /hssp/play`, `FunscriptPlayer` streams TCode at ~100 Hz to Restim.
+`redirect.js` patches `fetch()` and `XMLHttpRequest` so every call to `handyfeeling.com` is routed through `pywebview.api.handy_call()` (a JS bridge — bypasses the Content-Security-Policy of modern sites). When FapTap calls `PUT /hssp/setup`, the fake server downloads the funscript URL and pre-processes the entire script into all 7 TCode axes. On `PUT /hssp/play`, `FunscriptPlayer` streams TCode at ~100 Hz to Restim.
 
 ### Path B — TheEdgy (live)
 
@@ -49,40 +56,54 @@ There are two independent data paths, one per supported site, sharing the same d
                               ws://localhost:12346/tcode  →  Restim
 ```
 
-1. `serial.js` replaces `navigator.serial` with a fake implementation. When TheEdgy calls `requestPort()` + `port.open()`, our fake port answers immediately and presents itself as a TCode v0.3 device via the readable stream.
-2. Bytes written to `port.writable` are forwarded via `pywebview.api.tcode_write()` to Python.
-3. `LiveBridge` parses the L0 stream and `LiveProcessor` derives the remaining 6 axes (L1, V0, C0, P0, P1, P3) using **causal** rolling windows — no look-ahead delay, suitable for live data at 10/20/50 Hz.
+`serial.js` replaces `navigator.serial` with a fake implementation. When TheEdgy calls `requestPort()` + `port.open()`, our fake port answers immediately and presents itself as a TCode v0.3 device. Bytes written to `port.writable` are forwarded via `pywebview.api.tcode_write()` to Python. `LiveProcessor` derives the remaining 6 axes (L1, V0, C0, P0, P1, P3) using **causal** rolling windows — no look-ahead delay, suitable for live data at 10/20/50 Hz.
 
-Both paths share the same `ConvertSettings` so all sidebar sliders affect both modes identically.
+### Path C — Network (LAN reverse proxy)
+
+```
+[Phone / VR / Laptop on LAN]
+            │  http://<host-ip>:8080
+            ▼
+┌─────────────────────────────┐
+│ Reverse proxy (aiohttp)     │
+│  /api/handy/* → fake server │
+│  /scripts-api/* → CDN       │
+│  /*  → upstream site        │
+│        (rewrite + strip CSP)│
+└──────────────┬──────────────┘
+               │
+               ▼
+   FunscriptPlayer → Restim
+```
+
+A reverse proxy fetches `https://faptap.net` (or `https://www.sexlikereal.com`) server-side, strips the security headers, and rewrites every reference to `handyfeeling.com` so it points back at the proxy. Handy API endpoints are routed locally to the same fake server FapTap/SLR talks to. **No DNS hijacking, no client-side certificate install, no JS injection on the client are required.** The proxy upstream is switchable at runtime via the sidebar.
+
+Both proxied sites share the same `ConvertSettings` so all sidebar sliders affect every mode identically.
 
 ## Features
 
 ### Sidebar
-- **Site switcher** at the top — toggle live between FapTap and TheEdgy.
+- **Mode switcher** at the top — toggle live between FapTap, TheEdgy, and Network.
+- **Network target picker** (visible only in Network mode) — switch between FapTap and SexLikeReal upstream without restart.
 - **Settings persisted** to `data/settings.json` and restored on startup.
-- All slider/toggle changes apply immediately to both data paths.
+- All slider/toggle changes apply immediately to all data paths.
 
-### General conversion (both paths)
+### General conversion (all paths)
 - 7 TCode axes generated from a single 1D position stream:
   - `L0` Alpha (position X), `L1` Beta (position Y)
   - `V0` Volume, `C0` Carrier frequency
   - `P0` Pulse frequency, `P1` Pulse width, `P3` Pulse rise time
 - **Configurable arc** (270°–360°) with clockwise / counter-clockwise toggle.
 - **Speed-driven dynamics** — speed continuously modulates volume, carrier, pulse parameters.
-- **Boost mode** — emphasizes short bursts inside otherwise slow passages.
+- **Boost mode** — emphasises short bursts inside otherwise slow passages.
 - **Volume envelope** with separate smoothing window + idle fade up/down.
 - **Position → Pulse Frequency** influence slider (with invert) — blends speed-driven pulse frequency with a pulse frequency that follows the position itself.
 - **Position normalization** — funscript min/max mapped to 0.0 / 1.0 (FapTap path).
 
-### TheEdgy path (live)
-- `serial.js` impersonates a USB TCode device (no real hardware needed).
-- `LiveProcessor` uses **causal** rolling windows — appropriate for dense (10/20/50 Hz) live streams without look-ahead.
-- Dedicated **Max / Min Speed (%/s)** inputs in the sidebar (visible only in TheEdgy mode) configure the speed envelope. Without them the processor auto-observes the peak speed.
-
-### FapTap path (funscript)
-- Fake Handy Cloud API (v2 + v3, HSSP / HSTP / HDSP endpoints).
-- Centered rolling-window speed (no lag) for offline conversion quality.
-- HTML5 fullscreen override for the in-app browser.
+### Per-path specifics
+- **TheEdgy:** dedicated **Max / Min Speed (%/s)** inputs (visible only in TheEdgy mode). Without them the live processor auto-observes the peak speed.
+- **FapTap:** Fake Handy Cloud API (v2 + v3, HSSP / HSTP / HDSP endpoints). Centred rolling-window speed (no lag). HTML5 fullscreen override for the embedded browser.
+- **Network:** runtime upstream switch (FapTap ↔ SexLikeReal). Browser-like User-Agent and Cookie session per upstream. Set-Cookie domain/Secure attributes are rewritten so cookies stick on the proxy host.
 
 ## Requirements
 
@@ -103,9 +124,10 @@ Both paths share the same `ConvertSettings` so all sidebar sliders affect both m
    - `P1` → Pulse Width
    - `P3` → Pulse Rise Time
 4. Run `RestimWebExtension.exe`.
-5. Pick a site from the sidebar:
+5. Pick a mode in the sidebar:
    - **FapTap** → choose a video, set device to "The Handy", enter any connection key, hit play.
    - **TheEdgy** → choose **T-Code** in their device picker; the fake serial port is auto-accepted.
+   - **Network** → the embedded browser shows the proxy URL. Open that URL on any LAN device, then proceed as in FapTap mode (or pick SexLikeReal in the sub-picker).
 
 ## From source
 
@@ -116,7 +138,7 @@ pip install -r requirements.txt
 python src/main.py
 ```
 
-The site can be preselected via env var: `SITE=theedgy python src/main.py`.
+The mode can be preselected via env var: `SITE=theedgy python src/main.py` (also supports `faptap`, `network`). The network upstream defaults to `faptap` — switch via `NETWORK_TARGET=sexlikereal python src/main.py`.
 
 ## Building the .exe
 
@@ -132,14 +154,16 @@ The output is a single-file `dist/RestimWebExtension.exe`.
 ```
 src/
 ├── main.py                       App entry, pywebview setup, JS bridge
-├── config.py                     Ports, URLs, supported sites
+├── config.py                     Ports, URLs, supported sites + network targets
 ├── fake_handy/
-│   └── server.py                 Handy API v2 + v3 impersonation (FapTap path)
+│   └── server.py                 Handy API v2 + v3 impersonation (FapTap + Network)
+├── proxy/
+│   └── server.py                 LAN reverse proxy with runtime-switchable upstream
 ├── funscript/
 │   ├── converter.py              Offline converter (centered windows)
-│   ├── player.py                 Real-time funscript playback (FapTap path)
+│   ├── player.py                 Real-time funscript playback (FapTap / Network)
 │   ├── live_bridge.py            Receives WebSerial bytes, manages TCode WS
-│   └── live_processor.py         Causal converter (TheEdgy path)
+│   └── live_processor.py         Causal converter (TheEdgy)
 ├── restim/
 │   └── tcode_client.py           WebSocket TCode client
 ├── ui/
@@ -150,9 +174,14 @@ src/
     └── fullscreen.js             HTML5 fullscreen API shim
 ```
 
+## Known limitations
+
+- The Network proxy currently does not tunnel WebSocket connections. Sites that rely on a WebSocket for live state (other than Handy cloud calls) may not fully work through the proxy.
+- Cloudflare bot detection occasionally challenges the proxy on first load — refresh in the client browser to retry. If a target site blocks the proxy persistently, the FapTap embedded mode is unaffected.
+
 ## Disclaimer
 
-This project is not affiliated with FapTap, TheEdgy, The Handy (Sweet Tech AS), Buttplug.io, or diglet48/restim. It is a third-party tool for personal use that bridges browser-based content with local e-stim hardware. Use it responsibly and in accordance with the terms of service of any site you visit.
+This project is not affiliated with FapTap, TheEdgy, SexLikeReal, The Handy (Sweet Tech AS), Buttplug.io, or diglet48/restim. It is a third-party tool for personal use that bridges browser-based content with local e-stim hardware. Use it responsibly and in accordance with the terms of service of any site you visit.
 
 ## License
 

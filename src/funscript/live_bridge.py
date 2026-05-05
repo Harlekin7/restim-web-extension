@@ -65,7 +65,7 @@ class LiveBridge:
         try:
             asyncio.run_coroutine_threadsafe(self._queue.put(text), self._loop)
         except Exception as e:
-            self._log(f"Live write queue Fehler: {e}")
+            self._log(f"Live write queue error: {e}")
 
     def update_settings(self, data):
         """Apply sidebar-slider updates to the live processor."""
@@ -106,7 +106,7 @@ class LiveBridge:
             self._tcode = TCodeClient(url=self._restim_url, on_log=self._log)
             self._loop.run_until_complete(self._main())
         except Exception as e:
-            self._log(f"LiveBridge Fehler: {e}")
+            self._log(f"LiveBridge error: {e}")
 
     async def _main(self):
         connected_once = False

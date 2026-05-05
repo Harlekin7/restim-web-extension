@@ -97,7 +97,8 @@ class LiveProcessor:
         vol_raw = lerp(self._volume_envelope, s.volume_min, vol_target)
         car = lerp(effective_spd, s.carrier_freq_min, s.carrier_freq_max)
         pfr_speed = lerp(effective_spd, s.pulse_freq_min, s.pulse_freq_max)
-        pfr_pos = (1.0 - pos) if s.position_freq_invert else pos
+        pfr_pos_norm = (1.0 - pos) if s.position_freq_invert else pos
+        pfr_pos = lerp(pfr_pos_norm, s.pulse_freq_min, s.pulse_freq_max)
         pfr = lerp(s.position_freq_influence, pfr_speed, pfr_pos)
         pwi = lerp(effective_spd, s.pulse_width_min, s.pulse_width_max)
         pri = lerp(effective_spd, s.pulse_rise_min, s.pulse_rise_max)

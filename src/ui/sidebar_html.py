@@ -1,5 +1,5 @@
 SIDEBAR_HTML = """<!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <style>
@@ -172,6 +172,7 @@ SIDEBAR_HTML = """<!DOCTYPE html>
     <div class="site-switcher">
         <button class="site-btn" data-site="faptap">FapTap</button>
         <button class="site-btn" data-site="theedgy">TheEdgy</button>
+        <button class="site-btn" data-site="network">Network</button>
     </div>
 </div>
 
@@ -180,7 +181,16 @@ SIDEBAR_HTML = """<!DOCTYPE html>
     <div class="group-title">Server</div>
     <div class="status-line">
         <span class="dot" id="server-dot"></span>
-        <span class="value" id="server-status">Wird gestartet...</span>
+        <span class="value" id="server-status">Starting...</span>
+    </div>
+</div>
+
+<!-- Network proxy target (only visible in network mode) -->
+<div class="group" id="group-network" style="display:none;">
+    <div class="group-title">Network Target</div>
+    <div class="site-switcher">
+        <button class="site-btn target-btn" data-target="faptap">FapTap</button>
+        <button class="site-btn target-btn" data-target="sexlikereal">SexLikeReal</button>
     </div>
 </div>
 
@@ -204,29 +214,29 @@ SIDEBAR_HTML = """<!DOCTYPE html>
     <div class="group-title">Funscript</div>
     <div class="status-line">
         <span class="label">Status:</span>
-        <span class="value" id="script-status">Warte auf Verbindung...</span>
+        <span class="value" id="script-status">Waiting for connection...</span>
     </div>
     <div class="status-line">
-        <span class="label">Aktionen:</span>
+        <span class="label">Actions:</span>
         <span class="value" id="script-actions">-</span>
     </div>
     <div class="status-line">
-        <span class="label">Dauer:</span>
+        <span class="label">Duration:</span>
         <span class="value" id="script-duration">-</span>
     </div>
-    <div id="script-preview">Script-Vorschau...</div>
+    <div id="script-preview">Script preview...</div>
 </div>
 
-<!-- ════════ ALLGEMEIN ════════ -->
+<!-- ════════ GENERAL ════════ -->
 <div class="group">
-    <div class="group-title">Allgemein</div>
+    <div class="group-title">General</div>
 
     <!-- Arc -->
     <div class="param-row">
-        <span class="param-label">Arc Grad</span>
+        <span class="param-label">Arc Degrees</span>
         <input type="range" class="param-range" id="s-arc" min="270" max="360" step="5" value="270">
         <span class="param-val" id="v-arc">270</span>
-        <button class="toggle-btn" id="btn-invert" title="Arc invertieren">Inv</button>
+        <button class="toggle-btn active" id="btn-invert" title="Invert arc">Inv</button>
     </div>
 
     <div class="section-sep"></div>
@@ -234,18 +244,18 @@ SIDEBAR_HTML = """<!DOCTYPE html>
     <!-- Speed -->
     <div class="param-row">
         <span class="param-label">Speed Window</span>
-        <input type="number" class="param-input" id="s-speed-win" min="1" max="30" step="0.5" value="5.0">
+        <input type="number" class="param-input" id="s-speed-win" min="1" max="30" step="0.5" value="3">
         <span class="param-val">s</span>
     </div>
     <div class="param-row">
         <span class="param-label">Min Radius</span>
-        <input type="range" class="param-range" id="s-min-rad" min="0.05" max="0.5" step="0.05" value="0.1">
-        <span class="param-val" id="v-min-rad">0.10</span>
+        <input type="range" class="param-range" id="s-min-rad" min="0.05" max="0.5" step="0.05" value="0.5">
+        <span class="param-val" id="v-min-rad">0.50</span>
     </div>
     <div class="param-row">
         <span class="param-label">Speed Thr.</span>
-        <input type="range" class="param-range" id="s-speed-thr" min="0.1" max="1.0" step="0.05" value="0.5">
-        <span class="param-val" id="v-speed-thr">0.50</span>
+        <input type="range" class="param-range" id="s-speed-thr" min="0.1" max="1.0" step="0.05" value="1.0">
+        <span class="param-val" id="v-speed-thr">1.00</span>
     </div>
 
     <div class="section-sep"></div>
@@ -253,11 +263,11 @@ SIDEBAR_HTML = """<!DOCTYPE html>
     <!-- Volume -->
     <div class="param-row">
         <span class="param-label">Vol Min</span>
-        <input type="number" class="param-input" id="s-vol-min" min="0" max="1" step="0.01" value="0.20">
+        <input type="number" class="param-input" id="s-vol-min" min="0" max="1" step="0.01" value="0.85">
     </div>
     <div class="param-row">
         <span class="param-label">Vol Max</span>
-        <input type="number" class="param-input" id="s-vol-max" min="0" max="1" step="0.01" value="0.95">
+        <input type="number" class="param-input" id="s-vol-max" min="0" max="1" step="0.01" value="1.0">
     </div>
     <div class="param-row">
         <span class="param-label">Vol Window</span>
@@ -280,7 +290,7 @@ SIDEBAR_HTML = """<!DOCTYPE html>
     <!-- Boost -->
     <div class="param-row">
         <span class="param-label">Boost</span>
-        <button class="toggle-btn" id="btn-boost" title="Burst-Erkennung">Aus</button>
+        <button class="toggle-btn" id="btn-boost" title="Burst detection">Off</button>
     </div>
     <div class="param-row" id="boost-settings" style="display:none;">
         <span class="param-label">Strength</span>
@@ -298,9 +308,9 @@ SIDEBAR_HTML = """<!DOCTYPE html>
     <!-- Position → Pulse Freq -->
     <div class="param-row">
         <span class="param-label">Pos Freq</span>
-        <input type="range" class="param-range" id="s-pos-freq" min="0" max="1" step="0.05" value="0">
-        <span class="param-val" id="v-pos-freq">0.00</span>
-        <button class="toggle-btn" id="btn-pos-freq-inv" title="Position invertieren">Inv</button>
+        <input type="range" class="param-range" id="s-pos-freq" min="0" max="1" step="0.05" value="0.30">
+        <span class="param-val" id="v-pos-freq">0.30</span>
+        <button class="toggle-btn active" id="btn-pos-freq-inv" title="Invert position">Inv</button>
     </div>
 </div>
 
@@ -308,16 +318,16 @@ SIDEBAR_HTML = """<!DOCTYPE html>
 <div class="group">
     <div class="group-title">Pulse Settings</div>
 
-    <!-- Carrier Freq: 0-1 in Restim (skaliert intern) -->
+    <!-- Carrier Freq: 0-1 in Restim (scaled internally) -->
     <div class="param-row">
         <span class="param-label">CarFreq Min</span>
-        <input type="range" class="param-range" id="s-car-min" min="0" max="0.8" step="0.05" value="0.4">
-        <span class="param-val" id="v-car-min">0.40</span>
+        <input type="range" class="param-range" id="s-car-min" min="0" max="1.0" step="0.05" value="0.80">
+        <span class="param-val" id="v-car-min">0.80</span>
     </div>
     <div class="param-row">
         <span class="param-label">CarFreq Max</span>
-        <input type="range" class="param-range" id="s-car-max" min="0.2" max="1.0" step="0.05" value="0.95">
-        <span class="param-val" id="v-car-max">0.95</span>
+        <input type="range" class="param-range" id="s-car-max" min="0.2" max="1.0" step="0.05" value="1.0">
+        <span class="param-val" id="v-car-max">1.00</span>
     </div>
 
     <div class="section-sep"></div>
@@ -325,13 +335,13 @@ SIDEBAR_HTML = """<!DOCTYPE html>
     <!-- Pulse Freq -->
     <div class="param-row">
         <span class="param-label">PulseF Min</span>
-        <input type="range" class="param-range" id="s-pf-min" min="0" max="0.8" step="0.05" value="0.3">
-        <span class="param-val" id="v-pf-min">0.30</span>
+        <input type="range" class="param-range" id="s-pf-min" min="0" max="1.0" step="0.05" value="0.0">
+        <span class="param-val" id="v-pf-min">0.00</span>
     </div>
     <div class="param-row">
         <span class="param-label">PulseF Max</span>
-        <input type="range" class="param-range" id="s-pf-max" min="0.2" max="1.0" step="0.05" value="0.9">
-        <span class="param-val" id="v-pf-max">0.90</span>
+        <input type="range" class="param-range" id="s-pf-max" min="0" max="1.0" step="0.05" value="1.0">
+        <span class="param-val" id="v-pf-max">1.00</span>
     </div>
 
     <div class="section-sep"></div>
@@ -339,13 +349,13 @@ SIDEBAR_HTML = """<!DOCTYPE html>
     <!-- Pulse Width -->
     <div class="param-row">
         <span class="param-label">PulseW Min</span>
-        <input type="range" class="param-range" id="s-pw-min" min="0" max="0.5" step="0.05" value="0.1">
-        <span class="param-val" id="v-pw-min">0.10</span>
+        <input type="range" class="param-range" id="s-pw-min" min="0" max="1.0" step="0.05" value="0.0">
+        <span class="param-val" id="v-pw-min">0.00</span>
     </div>
     <div class="param-row">
         <span class="param-label">PulseW Max</span>
-        <input type="range" class="param-range" id="s-pw-max" min="0.1" max="1.0" step="0.05" value="0.5">
-        <span class="param-val" id="v-pw-max">0.50</span>
+        <input type="range" class="param-range" id="s-pw-max" min="0" max="1.0" step="0.05" value="1.0">
+        <span class="param-val" id="v-pw-max">1.00</span>
     </div>
 
     <div class="section-sep"></div>
@@ -371,7 +381,7 @@ SIDEBAR_HTML = """<!DOCTYPE html>
 
 <script>
     // ── Toggle states ─────────────────────────────────────────
-    var arcInverted = false;
+    var arcInverted = true;
     document.getElementById('btn-invert').addEventListener('click', function() {
         arcInverted = !arcInverted;
         this.className = 'toggle-btn' + (arcInverted ? ' active' : '');
@@ -382,13 +392,13 @@ SIDEBAR_HTML = """<!DOCTYPE html>
     document.getElementById('btn-boost').addEventListener('click', function() {
         boostEnabled = !boostEnabled;
         this.className = 'toggle-btn' + (boostEnabled ? ' active' : '');
-        this.textContent = boostEnabled ? 'An' : 'Aus';
+        this.textContent = boostEnabled ? 'On' : 'Off';
         document.getElementById('boost-settings').style.display = boostEnabled ? 'flex' : 'none';
         document.getElementById('boost-settings2').style.display = boostEnabled ? 'flex' : 'none';
         notifySettingsChanged();
     });
 
-    var posFreqInverted = false;
+    var posFreqInverted = true;
     document.getElementById('btn-pos-freq-inv').addEventListener('click', function() {
         posFreqInverted = !posFreqInverted;
         this.className = 'toggle-btn' + (posFreqInverted ? ' active' : '');
@@ -448,11 +458,34 @@ SIDEBAR_HTML = """<!DOCTYPE html>
 
     function setActiveSite(site) {
         currentSite = site;
-        document.querySelectorAll('.site-btn').forEach(function(b) {
+        document.querySelectorAll('.site-btn[data-site]').forEach(function(b) {
             b.classList.toggle('active', b.getAttribute('data-site') === site);
         });
         document.getElementById('group-theedgy').style.display =
             (site === 'theedgy') ? 'block' : 'none';
+        document.getElementById('group-network').style.display =
+            (site === 'network') ? 'block' : 'none';
+    }
+
+    // ── Network target picker ─────────────────────────────────
+    var currentTarget = 'faptap';
+    document.querySelectorAll('.target-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var target = btn.getAttribute('data-target');
+            if (target === currentTarget) return;
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.set_network_target) {
+                window.pywebview.api.set_network_target(target).then(function(ok) {
+                    if (ok) setActiveTarget(target);
+                });
+            }
+        });
+    });
+
+    function setActiveTarget(target) {
+        currentTarget = target;
+        document.querySelectorAll('.target-btn').forEach(function(b) {
+            b.classList.toggle('active', b.getAttribute('data-target') === target);
+        });
     }
 
     // ── Collect all settings ──────────────────────────────────
@@ -533,7 +566,7 @@ SIDEBAR_HTML = """<!DOCTYPE html>
                 boostEnabled = !!data[key];
                 var btn = document.getElementById(m.id);
                 btn.className = 'toggle-btn' + (boostEnabled ? ' active' : '');
-                btn.textContent = boostEnabled ? 'An' : 'Aus';
+                btn.textContent = boostEnabled ? 'On' : 'Off';
                 document.getElementById('boost-settings').style.display = boostEnabled ? 'flex' : 'none';
                 document.getElementById('boost-settings2').style.display = boostEnabled ? 'flex' : 'none';
             } else if (m.type === 'pos-freq-toggle') {
@@ -586,14 +619,14 @@ SIDEBAR_HTML = """<!DOCTYPE html>
             var actions = data.actions || [];
             var count = actions.length;
             if (count === 0) {
-                document.getElementById('script-status').textContent = 'Leeres Script';
+                document.getElementById('script-status').textContent = 'Empty script';
                 return;
             }
             var durMs = actions[count - 1].at;
             var mins = Math.floor(durMs / 60000);
             var secs = Math.floor((durMs % 60000) / 1000);
             var el = document.getElementById('script-status');
-            el.textContent = 'Script empfangen!';
+            el.textContent = 'Script received!';
             el.className = 'value green';
             document.getElementById('script-actions').textContent = count;
             document.getElementById('script-duration').textContent =
@@ -606,11 +639,11 @@ SIDEBAR_HTML = """<!DOCTYPE html>
                 lines.push(('       ' + a.at).slice(-7) + 'ms  pos=' + ('   ' + a.pos).slice(-3));
             }
             if (count > 15) {
-                lines.push('  ... (' + (count - 15) + ' weitere) ...');
+                lines.push('  ... (' + (count - 15) + ' more) ...');
             }
             document.getElementById('script-preview').textContent = lines.join('\\n');
         } catch(e) {
-            appendLog('Parse-Fehler: ' + e.message);
+            appendLog('Parse error: ' + e.message);
         }
     }
 </script>

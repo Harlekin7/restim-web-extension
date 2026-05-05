@@ -34,10 +34,10 @@ class TCodeClient:
         try:
             self._ws = await websockets.connect(self.url)
             self._connected = True
-            self._on_log(f"Restim verbunden: {self.url}")
+            self._on_log(f"Restim connected: {self.url}")
         except Exception as e:
             self._connected = False
-            self._on_log(f"Restim Verbindung fehlgeschlagen: {e}")
+            self._on_log(f"Restim connection failed: {e}")
 
     async def disconnect(self):
         if self._ws:
@@ -57,7 +57,7 @@ class TCodeClient:
             await self._ws.send(cmd)
         except Exception:
             self._connected = False
-            self._on_log("Restim Verbindung verloren")
+            self._on_log("Restim connection lost")
 
     @property
     def connected(self):

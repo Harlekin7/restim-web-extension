@@ -16,9 +16,10 @@ data/
 # Reference repos (cloned locally for research, not part of the project)
 references/
 
-# IDE / Editor
+# IDE / Editor / tool config
 .vscode/
 .idea/
+.claude/
 *.swp
 *.swo
 *~

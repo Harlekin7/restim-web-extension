@@ -7,42 +7,42 @@ class ConvertSettings:
     def __init__(self):
         # Arc conversion
         self.arc_degrees = 270.0        # 270-360, arc coverage
-        self.arc_invert = False         # invertiert die Laufrichtung
+        self.arc_invert = True          # flips arc rotation direction
         self.points_per_second = 25     # output sample rate
 
         # Speed-responsive radius
-        self.speed_window = 5.0         # rolling window in seconds
-        self.min_radius = 0.1           # radius at speed=0 (0.0-0.5)
-        self.speed_threshold = 0.5      # speed fraction for max radius
+        self.speed_window = 3.0         # rolling window in seconds
+        self.min_radius = 0.5           # radius at speed=0 (0.0-0.5)
+        self.speed_threshold = 1.0      # speed fraction for max radius
 
         # Speed → parameter mappings (min at speed=0, max at speed=1)
-        self.volume_min = 0.20
-        self.volume_max = 0.95
-        self.carrier_freq_min = 0.40
-        self.carrier_freq_max = 0.95
-        self.pulse_freq_min = 0.30
-        self.pulse_freq_max = 0.90
-        self.pulse_width_min = 0.10
-        self.pulse_width_max = 0.50
+        self.volume_min = 0.85
+        self.volume_max = 1.0
+        self.carrier_freq_min = 0.80
+        self.carrier_freq_max = 1.0
+        self.pulse_freq_min = 0.0
+        self.pulse_freq_max = 1.0
+        self.pulse_width_min = 0.0
+        self.pulse_width_max = 1.0
         self.pulse_rise_min = 0.00
         self.pulse_rise_max = 0.80
 
-        # Boost: hebt schnelle Bewegungen in langsamen Passagen hervor
+        # Boost: emphasises fast movements inside slow passages
         self.boost_enabled = False
-        self.boost_window = 0.5         # Sekunden: kurzes Fenster fuer Burst-Erkennung
-        self.boost_strength = 1.0       # Staerke des Boost-Effekts (0-3)
+        self.boost_window = 0.5         # seconds: short window for burst detection
+        self.boost_strength = 1.0       # strength of the boost effect (0-3)
 
-        # Position → Pulse Freq Einfluss
-        # 0 = Pulse Freq rein speed-basiert (bisher), 1 = Pulse Freq folgt der Position
-        self.position_freq_influence = 0.0
-        self.position_freq_invert = False
+        # Position → Pulse Freq influence
+        # 0 = Pulse Freq purely speed-driven, 1 = Pulse Freq follows position
+        self.position_freq_influence = 0.30
+        self.position_freq_invert = True
 
         # Volume smoothing + fade
-        self.volume_window = 3.0        # Sekunden: separates Glaettungsfenster fuer Volume
-        self.volume_fade_down = 1.0     # Sekunden bis Volume auf min faded
-        self.volume_fade_up = 0.3       # Sekunden bis Volume wieder auf Soll
-        self.idle_window = 0.5          # Sekunden: Fenster fuer Stillstand-Erkennung
-        self.idle_threshold = 0.01      # Positions-Aenderung unter der = Stillstand
+        self.volume_window = 3.0        # seconds: separate smoothing window for volume
+        self.volume_fade_down = 1.0     # seconds for volume to fade to min
+        self.volume_fade_up = 0.3       # seconds for volume to fade back up to target
+        self.idle_window = 0.5          # seconds: window for idle detection
+        self.idle_threshold = 0.01      # position change below this = idle
 
 
 def convert_funscript(funscript_data, settings=None):
@@ -150,7 +150,7 @@ def convert_funscript(funscript_data, settings=None):
             recent_movement += abs(positions[i - j] - positions[i - j - 1])
         is_idle = recent_movement < settings.idle_threshold
 
-        # Volume envelope: fade down bei Stillstand, fade up bei Bewegung
+        # Volume envelope: fade down on idle, fade up on movement
         if not is_idle:
             fade_rate = dt / settings.volume_fade_up if settings.volume_fade_up > 0 else 1.0
             volume_envelope = min(1.0, volume_envelope + fade_rate)
@@ -163,7 +163,8 @@ def convert_funscript(funscript_data, settings=None):
         vol = lerp(volume_envelope, settings.volume_min, vol_target)
         car = lerp(effective_spd, settings.carrier_freq_min, settings.carrier_freq_max)
         pfr_speed = lerp(effective_spd, settings.pulse_freq_min, settings.pulse_freq_max)
-        pfr_pos = (1.0 - pos) if settings.position_freq_invert else pos
+        pfr_pos_norm = (1.0 - pos) if settings.position_freq_invert else pos
+        pfr_pos = lerp(pfr_pos_norm, settings.pulse_freq_min, settings.pulse_freq_max)
         pfr = lerp(settings.position_freq_influence, pfr_speed, pfr_pos)
         pwi = lerp(effective_spd, settings.pulse_width_min, settings.pulse_width_max)
         pri = lerp(effective_spd, settings.pulse_rise_min, settings.pulse_rise_max)

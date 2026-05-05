@@ -34,14 +34,14 @@ class FunscriptPlayer:
         if self._converted:
             count = len(self._converted["times_ms"])
             dur = self._converted["times_ms"][-1] / 1000
-            self._on_log(f"Konvertiert: {count} Punkte, {dur:.0f}s")
+            self._on_log(f"Converted: {count} points, {dur:.0f}s")
         else:
-            self._on_log("Konvertierung fehlgeschlagen (zu wenig Daten)")
+            self._on_log("Conversion failed (not enough data)")
 
     async def play(self, start_time_ms=0):
         """Start playback from the given position."""
         if not self._converted:
-            self._on_log("Kein Script geladen")
+            self._on_log("No script loaded")
             return
 
         await self.stop()
@@ -54,7 +54,7 @@ class FunscriptPlayer:
         self._play_start_offset = start_time_ms
         self._play_start_real = time.monotonic()
         self._task = asyncio.ensure_future(self._playback_loop())
-        self._on_log(f"Playback gestartet bei {start_time_ms}ms")
+        self._on_log(f"Playback started at {start_time_ms}ms")
 
     async def stop(self):
         """Stop playback."""
@@ -83,7 +83,7 @@ class FunscriptPlayer:
                 current_ms = self._play_start_offset + int(elapsed_s * 1000)
 
                 if current_ms > total_duration_ms:
-                    self._on_log("Playback beendet (Ende erreicht)")
+                    self._on_log("Playback finished (reached end)")
                     break
 
                 # Interpolate all axes at current time
