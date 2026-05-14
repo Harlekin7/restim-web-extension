@@ -71,8 +71,8 @@ _TRACK_AXES: dict[str, set[AxisName]] = {
 # what the pattern outputs. Lower = subtler.
 # E-stim users notice volume changes very strongly, so we keep this tight.
 VOLUME_MOD_DEPTH_BY_TRACK: dict[str, float] = {
-    TRACK_VOLUME:     0.20,   # V-patterns: subtle ripple around the macro arc
-    TRACK_MULTI_AXIS: 0.35,   # M-patterns: a bit more freedom for synced moves
+    TRACK_VOLUME:     0.10,   # V-patterns: very tight ripple around the macro arc
+    TRACK_MULTI_AXIS: 0.18,   # M-patterns: a touch more freedom for synced moves
 }
 
 
