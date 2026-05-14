@@ -64,6 +64,18 @@ _TRACK_AXES: dict[str, set[AxisName]] = {
 }
 
 
+# How much of the master.intensity range a pattern is allowed to modulate
+# the Volume axis around. Values are "modulation depth": pattern_out=0 maps to
+# master*(1-depth), pattern_out=1 maps to master*1.0. So depth=0.2 means
+# Volume stays within ±20% of the macro envelope's current value, no matter
+# what the pattern outputs. Lower = subtler.
+# E-stim users notice volume changes very strongly, so we keep this tight.
+VOLUME_MOD_DEPTH_BY_TRACK: dict[str, float] = {
+    TRACK_VOLUME:     0.20,   # V-patterns: subtle ripple around the macro arc
+    TRACK_MULTI_AXIS: 0.35,   # M-patterns: a bit more freedom for synced moves
+}
+
+
 @dataclass
 class _TrackState:
     last_pattern_id: Optional[str] = None
@@ -159,11 +171,14 @@ class MicroRenderer:
         for axis in (raw_out.keys() if track == TRACK_MULTI_AXIS else owned):
             if axis in raw_out:
                 v = float(raw_out[axis][0]) * slot.intensity_scale
-                # Volume axis: multiply pattern output by master.intensity so the
-                # macro envelope remains the global volume-shape master. Patterns
-                # become local-shape modulators on top of it.
+                # Volume: bounded modulation around master.intensity. Patterns can
+                # only nudge Volume within ±depth of the macro envelope, so the
+                # global arc stays in charge. Subjective volume swings are huge
+                # in e-stim — small ripple is plenty.
                 if axis == AxisName.VOLUME:
-                    v = v * master.intensity
+                    depth = VOLUME_MOD_DEPTH_BY_TRACK.get(track, 0.20)
+                    pattern_factor = (1.0 - depth) + depth * float(np.clip(v, 0.0, 1.0))
+                    v = master.intensity * pattern_factor
                 new_axes[axis] = max(0.0, min(1.0, v))
 
         # Detect new pattern → initialise crossfade
