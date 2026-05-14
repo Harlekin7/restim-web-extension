@@ -39,9 +39,16 @@ PatternRegistry = dict[str, "PatternRendererProtocol"]
 
 
 class MesoScheduler:
-    """Lazily-imported pattern catalog so Meso can be loaded standalone in tests."""
+    """Lazily-imported pattern catalog so Meso can be loaded standalone in tests.
 
-    def __init__(self, catalog: Optional[PatternRegistry] = None):
+    Optional `markov_sampler` overrides the default heuristic pattern selection
+    once the trained model from Agent D is available. The sampler is expected
+    to expose `sample_next(prev_pattern, style, phase, rng) -> str` and a list
+    of valid pattern IDs `pattern_ids`.
+    """
+
+    def __init__(self, catalog: Optional[PatternRegistry] = None,
+                 markov_sampler=None):
         if catalog is None:
             try:
                 from .pattern_catalog import ALL_PATTERNS
@@ -49,6 +56,7 @@ class MesoScheduler:
             except Exception:
                 catalog = {}
         self.catalog = catalog
+        self.markov_sampler = markov_sampler
 
     def schedule(self, profile: SessionProfile, plan: MacroPlan,
                  seed: Optional[int] = None) -> MesoSchedule:
@@ -82,16 +90,31 @@ class MesoScheduler:
             # Surprise injection
             is_surprise = rng.random() < (surprises_per_min * slot_dur / 60.0)
 
-            pattern_id = self._pick_pattern(
-                pool=active_pool,
-                phase=phase,
-                style=profile.style,
-                last_id=slots[-1].pattern_id if slots else None,
-                recency=recency_q,
-                recency_lockout_dur_units=recency_lockout / max(slot_dur, 1e-6),
-                rng=rng,
-                surprise_mode=is_surprise,
-            )
+            # If a learned Markov is available, use it for the bulk of selections.
+            # We still fall back to the heuristic picker for surprise mode (Markov is
+            # by definition the average behaviour — surprises are explicit deviations)
+            # and when prev_id is None (no Markov context yet).
+            prev_id = slots[-1].pattern_id if slots else None
+            if self.markov_sampler is not None and prev_id is not None and not is_surprise:
+                pattern_id = self.markov_sampler.sample_next(
+                    prev_pattern=prev_id,
+                    style=profile.style.value,
+                    phase=phase.value,
+                    rng=rng,
+                )
+                # Markov may pick a pattern that's not in the active pool — accept anyway,
+                # since Markov has already been trained on real-world style affinity.
+            else:
+                pattern_id = self._pick_pattern(
+                    pool=active_pool,
+                    phase=phase,
+                    style=profile.style,
+                    last_id=prev_id,
+                    recency=recency_q,
+                    recency_lockout_dur_units=recency_lockout / max(slot_dur, 1e-6),
+                    rng=rng,
+                    surprise_mode=is_surprise,
+                )
 
             if pattern_id is None:
                 # No suitable pattern — skip a small amount of time and retry

@@ -27,10 +27,12 @@ class SessionBridge:
 
     def __init__(self, restim_url: str = "ws://127.0.0.1:12346/tcode",
                  on_log: Optional[Callable[[str], None]] = None,
-                 on_status: Optional[Callable[[SessionStatus], None]] = None):
+                 on_status: Optional[Callable[[SessionStatus], None]] = None,
+                 models_dir: Optional[str] = None):
         self.restim_url = restim_url
         self._on_log = on_log or (lambda msg: None)
         self._on_status = on_status or (lambda s: None)
+        self.models_dir = models_dir
 
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._loop_thread: Optional[threading.Thread] = None
@@ -39,6 +41,37 @@ class SessionBridge:
         self._current_session_task: Optional[asyncio.Task] = None
         self._profile_draft: Optional[SessionProfile] = None
         self._envelope_draft: Optional[dict] = None
+
+        # Learned models (loaded lazily — set to None if Agent D output not present)
+        self._envelope_sampler = None
+        self._markov_sampler = None
+        self._try_load_models()
+
+    def _try_load_models(self) -> None:
+        """Best-effort load of learned models. Falls back to heuristics if missing."""
+        if self.models_dir is None:
+            from pathlib import Path
+            self.models_dir = str(Path(__file__).parent.parent.parent / "data" / "models")
+
+        try:
+            from .learned_envelope import load_sampler
+            from pathlib import Path
+            env_path = Path(self.models_dir) / "macro_envelope_sampler.json"
+            if env_path.exists():
+                self._envelope_sampler = load_sampler(str(env_path))
+                self._on_log(f"Loaded envelope sampler from {env_path.name}")
+        except Exception as e:
+            self._on_log(f"Envelope sampler not loaded: {e}")
+
+        try:
+            from .learned_markov import load_markov
+            from pathlib import Path
+            m_path = Path(self.models_dir) / "pattern_markov.json"
+            if m_path.exists():
+                self._markov_sampler = load_markov(str(m_path))
+                self._on_log(f"Loaded Markov sampler from {m_path.name}")
+        except Exception as e:
+            self._on_log(f"Markov sampler not loaded: {e}")
 
     # ---- Lifecycle ----
 
@@ -149,17 +182,26 @@ class SessionBridge:
             self._on_log("TCode client not initialized")
             return False
 
-        # Create runner
+        # Create runner — pass learned samplers if available
         self._runner = SessionRunner(
             tcode_send=self._tcode_client.send,
             on_status=self._on_status,
         )
+        # Inject learned samplers into the runner's planner/scheduler factories
+        # (SessionRunner currently uses default factories; we pass them via attribute)
+        self._runner._envelope_sampler = self._envelope_sampler
+        self._runner._markov_sampler = self._markov_sampler
 
-        # Apply envelope if present (override macro intensity curve points)
         profile = self._profile_draft
         future = asyncio.run_coroutine_threadsafe(self._runner.start(profile), self._loop)
         self._current_session_task = future
-        self._on_log(f"Session started: {profile.style.value}, {profile.duration_s}s")
+        used = []
+        if self._envelope_sampler:
+            used.append("learned-envelope")
+        if self._markov_sampler:
+            used.append("learned-markov")
+        suffix = f" [{','.join(used)}]" if used else ""
+        self._on_log(f"Session started: {profile.style.value}, {profile.duration_s}s{suffix}")
         return True
 
     def session_pause(self) -> None:

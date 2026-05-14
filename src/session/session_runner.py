@@ -60,6 +60,10 @@ class SessionRunner:
         self._panic_flag = False
         self._task: Optional[asyncio.Task] = None
 
+        # Optional learned models — set by SessionBridge before start()
+        self._envelope_sampler = None
+        self._markov_sampler = None
+
         # Set during start()
         self.profile: Optional[SessionProfile] = None
         self.plan: Optional[MacroPlan] = None
@@ -74,9 +78,13 @@ class SessionRunner:
         """Plan the session and run the live loop until end or stop."""
         self.profile = profile
 
-        # Plan & schedule
-        self.plan = MacroPlanner().plan(profile)
-        self.schedule = MesoScheduler().schedule(profile, self.plan)
+        # Plan & schedule (use learned samplers if injected)
+        self.plan = MacroPlanner(
+            learned_intensity_sampler=self._envelope_sampler,
+        ).plan(profile)
+        self.schedule = MesoScheduler(
+            markov_sampler=self._markov_sampler,
+        ).schedule(profile, self.plan)
         self.renderer = MicroRenderer(profile, self.plan, self.schedule, dt=self.dt_s)
         self.guard = SafetyGuard(profile, t_start=0.0, dt=self.dt_s)
 

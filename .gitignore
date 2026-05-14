@@ -10,8 +10,11 @@ __pycache__/
 venv/
 env/
 
-# User data (browser cache, persisted settings)
+# User data (browser cache, persisted settings, large training corpora)
 data/
+# but DO ship trained models with the repo (small, required at runtime)
+!data/models/
+!data/models/**
 
 # Reference repos (cloned locally for research, not part of the project)
 references/

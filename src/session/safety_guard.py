@@ -18,16 +18,23 @@ from .types import AxisName
 
 
 # Per-axis slew-rate limits (max change per second in normalized 0..1 units)
-# Tuned so smooth patterns are unaffected, but pathological jumps are clamped.
+# Tuned so smooth patterns + edges are unaffected, but pathological jumps are clamped.
+# Volume is tighter on UPWARD changes (onset-response protection) than DOWNWARD
+# (panic-relevant), see SafetyGuard.process for the asymmetry.
 DEFAULT_SLEW_LIMITS_PER_S: dict[AxisName, float] = {
     AxisName.ALPHA: 5.0,           # position can move fast (visual rotation needs this)
     AxisName.BETA: 5.0,
-    AxisName.VOLUME: 0.5,          # 50%/s = strict — protects against onset response
+    AxisName.VOLUME: 1.0,          # 100%/s upward cap (still gentle — see ONSET_RAMP_S)
     AxisName.CARRIER: 1.0,         # 1.0/s = full sweep in 1s, plenty
     AxisName.PULSE_FREQUENCY: 2.0,
     AxisName.PULSE_WIDTH: 1.5,
     AxisName.PULSE_RISE_TIME: 2.0,
 }
+
+# Onset ramp: first ONSET_RAMP_S seconds of any session, volume is hard-limited to a
+# linear ramp from 0 to vol_floor. This is the "sanftes Anfahren" — protects against
+# the synchronous-neuronal-onset spike documented in the Restim wiki.
+ONSET_RAMP_S = 8.0
 
 # Hard absolute floors to prevent zero-volume artifacts that some hardware misreads
 ABSOLUTE_FLOORS: dict[AxisName, float] = {
@@ -108,12 +115,18 @@ class SafetyGuard:
             if axis in ABSOLUTE_FLOORS and not self.state.panic_stop:
                 target = max(target, ABSOLUTE_FLOORS[axis])
 
-            # 4) Slew-rate limit (this enforces the volume ramp implicitly)
+            # 4) Onset ramp (separate from per-tick slew limit) — only for volume
+            # During the first ONSET_RAMP_S, hard-cap volume to a linear ramp 0 -> vol_floor.
+            # After that, the regular slew limit applies and the macro curve drives the value.
+            t_in_session = t - self.state.session_start_t
+            if axis == AxisName.VOLUME and not self.state.panic_stop and t_in_session < ONSET_RAMP_S:
+                onset_cap = self.caps["vol_floor"] * (t_in_session / ONSET_RAMP_S)
+                target = min(target, onset_cap)
+
+            # 5) Slew-rate limit per axis (asymmetric for volume: gentler upward)
             if axis == AxisName.VOLUME and not self.state.panic_stop:
-                # use experience-level ramp rate for upward changes; allow faster downward
-                ramp_rate = self.caps["ramp_per_minute"] / 60.0
-                max_change_up = ramp_rate * self.dt
-                max_change_down = self.dt * 2.0  # 2.0/s downward = ok
+                max_change_up = DEFAULT_SLEW_LIMITS_PER_S[axis] * self.dt
+                max_change_down = 2.0 * self.dt   # 2.0/s downward — fast for edges
             else:
                 slew_limit = DEFAULT_SLEW_LIMITS_PER_S[axis]
                 max_change_up = slew_limit * self.dt
@@ -126,7 +139,7 @@ class SafetyGuard:
             elif delta < -max_change_down:
                 target = prev - max_change_down
 
-            # 5) Clamp to [0, 1]
+            # 6) Clamp to [0, 1]
             target = max(0.0, min(1.0, target))
 
             out[axis] = target
