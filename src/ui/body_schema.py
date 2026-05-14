@@ -29,9 +29,6 @@ from typing import Optional
 # torso + genital diagram. They are NOT anatomically precise,
 # only functional for selection.
 ELECTRODE_POINTS: list[dict] = [
-    # Upper body
-    {"id": "brustwarze_l", "label": "Brustwarze L",  "x":  78, "y":  60},
-    {"id": "brustwarze_r", "label": "Brustwarze R",  "x": 122, "y":  60},
     # Penis (vertical schematic shaft, glans at bottom)
     {"id": "schaft_oben",  "label": "Schaft oben",   "x": 100, "y": 215},
     {"id": "schaft_unten", "label": "Schaft unten",  "x": 100, "y": 260},

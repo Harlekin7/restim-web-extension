@@ -76,12 +76,14 @@ def test_pipeline_offline():
         vals = np.array([s[axis] for s in samples_log])
         print(f"  {axis.value:18s}  mean={vals.mean():.3f}  min={vals.min():.3f}  max={vals.max():.3f}")
 
-    # Verify volume ramp was enforced
+    # Verify volume ramp at start (onset) — Volume must be 0 at t=0 and rising.
+    # We don't check monotonicity over the whole window because Volume-track
+    # patterns deliberately introduce local dips/spikes (V-series patterns).
     vol_first = samples_log[0][AxisName.VOLUME]
-    vol_mid = samples_log[len(samples_log)//2][AxisName.VOLUME]
-    vol_last = samples_log[-1][AxisName.VOLUME]
-    print(f"\nVolume ramp progression:  start={vol_first:.3f}  mid={vol_mid:.3f}  end={vol_last:.3f}")
-    assert vol_first <= vol_mid <= vol_last + 0.05, "Volume should ramp up over time!"
+    vol_after_5s = samples_log[min(len(samples_log)-1, 5*50)][AxisName.VOLUME]
+    print(f"\nVolume onset:  t=0s={vol_first:.3f}  t=5s={vol_after_5s:.3f}")
+    assert vol_first <= 0.05, "Onset ramp should start near 0"
+    assert vol_after_5s > vol_first, "Onset ramp should be rising"
     assert all(0.0 <= s[AxisName.VOLUME] <= 1.0 for s in samples_log), "Volume out of range!"
 
     print("\n[OK] Pipeline produces valid TCode without errors.")

@@ -49,8 +49,6 @@ class ElectrodePosition(str, Enum):
     DAMM = "damm"
     ANAL_PLUG = "anal_plug"
     PROSTATA = "prostata"
-    BRUSTWARZE_L = "brustwarze_l"
-    BRUSTWARZE_R = "brustwarze_r"
 
 
 class AxisName(str, Enum):

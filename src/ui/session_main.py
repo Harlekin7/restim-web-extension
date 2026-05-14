@@ -64,6 +64,10 @@ _TEMPLATE = r"""<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <title>Restim Session</title>
+<!-- uPlot must be loaded BEFORE the graph fragment runs its inline script. -->
+<script>
+/*__UPLOT_JS__*/
+</script>
 <style>
 /*__UPLOT_CSS__*/
 
@@ -363,11 +367,6 @@ h1 { font-size: 18px; color: #5af; font-weight: 500; margin-bottom: 14px; }
     </div>
   </div>
 </div>
-
-<!-- ── uPlot bundle ── -->
-<script>
-/*__UPLOT_JS__*/
-</script>
 
 <script>
 (function() {
