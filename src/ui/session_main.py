@@ -156,38 +156,95 @@ h1 { font-size: 18px; color: #5af; font-weight: 500; margin-bottom: 14px; }
 }
 .start-btn:hover { background: #339a52; }
 
-/* ── LIVE-VIEW ── */
-.live-view { display: none; }
+/* ── LIVE-VIEW (sticky top bar shown only while a session is running) ── */
+.live-view {
+    display: none;
+    position: sticky;
+    top: -1px;                     /* hide the 1px border into the viewport edge */
+    z-index: 100;
+    margin: -16px -16px 16px -16px; /* extend beyond body padding to the edges */
+    padding: 12px 16px;
+    background: linear-gradient(180deg, #1c2630 0%, #1a2128 100%);
+    border-bottom: 1px solid #2c5577;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+}
 .live-view.active { display: block; }
-.live-view .group { padding: 18px; }
-.live-bigvalue { display: flex; align-items: baseline; gap: 16px; margin-bottom: 16px; }
-.live-phase { font-size: 32px; font-weight: 600; color: #5af; }
-.live-time { font-size: 22px; font-family: Consolas, monospace; color: #fff; }
-.live-nextdrop { font-size: 13px; color: #888; margin-left: auto; }
-
-.live-axes {
-    display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px;
-    margin: 16px 0;
+.live-bar {
+    display: grid;
+    grid-template-columns: auto auto auto 1fr auto;
+    align-items: center;
+    gap: 18px;
 }
-.live-axis {
-    background: #1c1c1c; border: 1px solid #2a2a2a; border-radius: 4px;
-    padding: 6px; text-align: center;
+.live-bar .live-phase { font-size: 22px; font-weight: 600; color: #5af; min-width: 90px; }
+.live-bar .live-time { font-size: 18px; font-family: Consolas, monospace; color: #fff; }
+.live-bar .live-nextdrop { font-size: 12px; color: #aaa; }
+.live-bar .live-axes-row {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(60px, 1fr));
+    gap: 6px;
+    justify-self: stretch;
 }
-.live-axis .ax-name { font-size: 11px; color: #5af; }
-.live-axis canvas { width: 100%; height: 36px; display: block; margin: 4px 0; }
-.live-axis .ax-val { font-size: 12px; color: #ddd; font-family: Consolas, monospace; }
+.live-bar .live-axis {
+    background: rgba(0,0,0,0.25);
+    border: 1px solid #2a3a4a;
+    border-radius: 3px;
+    padding: 3px 4px;
+    text-align: center;
+    min-width: 0;
+}
+.live-bar .live-axis .ax-name { font-size: 10px; color: #5af; }
+.live-bar .live-axis canvas { width: 100%; height: 22px; display: block; margin: 2px 0 1px; }
+.live-bar .live-axis .ax-val { font-size: 11px; color: #ddd; font-family: Consolas, monospace; }
 
-.override-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 12px; }
+.live-bar .override-grid {
+    display: flex;
+    gap: 6px;
+}
 .override-btn {
-    padding: 10px; border: 1px solid #444; border-radius: 4px;
-    background: #2a2a2a; color: #ddd; font-size: 13px; cursor: pointer;
+    padding: 6px 10px;
+    border: 1px solid #444;
+    border-radius: 3px;
+    background: #2a2a2a;
+    color: #ddd;
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
 }
 .override-btn:hover { background: #353535; }
 .override-btn.danger { background: #6a2a2a; border-color: #a55; color: #fff; }
 .override-btn.danger:hover { background: #883535; }
+
+/* Make the start button reflect a running session */
+.start-btn.running { background: #444; color: #888; cursor: not-allowed; }
+.start-btn.running:hover { background: #444; }
 </style>
 </head>
 <body>
+
+<!-- ════════ LIVE-VIEW (sticky top bar — visible only while a session is running) ═══ -->
+<div id="live-view" class="live-view">
+  <div class="live-bar">
+    <div class="live-phase" id="live-phase">Init</div>
+    <div class="live-time" id="live-time">00:00</div>
+    <div class="live-nextdrop" id="live-nextdrop">next drop –</div>
+    <div class="live-axes-row" id="live-axes">
+      <div class="live-axis"><div class="ax-name">α</div><canvas data-ax="alpha"></canvas><div class="ax-val" data-ax-val="alpha">–</div></div>
+      <div class="live-axis"><div class="ax-name">β</div><canvas data-ax="beta"></canvas><div class="ax-val" data-ax-val="beta">–</div></div>
+      <div class="live-axis"><div class="ax-name">V</div><canvas data-ax="volume"></canvas><div class="ax-val" data-ax-val="volume">–</div></div>
+      <div class="live-axis"><div class="ax-name">C</div><canvas data-ax="carrier"></canvas><div class="ax-val" data-ax-val="carrier">–</div></div>
+      <div class="live-axis"><div class="ax-name">PF</div><canvas data-ax="pulse_frequency"></canvas><div class="ax-val" data-ax-val="pulse_frequency">–</div></div>
+      <div class="live-axis"><div class="ax-name">PW</div><canvas data-ax="pulse_width"></canvas><div class="ax-val" data-ax-val="pulse_width">–</div></div>
+      <div class="live-axis"><div class="ax-name">PR</div><canvas data-ax="pulse_rise_time"></canvas><div class="ax-val" data-ax-val="pulse_rise_time">–</div></div>
+    </div>
+    <div class="override-grid">
+      <button class="override-btn" data-act="pause">Pause</button>
+      <button class="override-btn" data-act="skip">Skip</button>
+      <button class="override-btn" data-act="edge">Edge</button>
+      <button class="override-btn" data-act="boost">Boost</button>
+      <button class="override-btn danger" data-act="stop">STOP</button>
+    </div>
+  </div>
+</div>
 
 <h1>Session-Modus — generative Stimulation</h1>
 
@@ -341,33 +398,6 @@ h1 { font-size: 18px; color: #5af; font-weight: 500; margin-bottom: 14px; }
 
 </div>  <!-- /cfg-view -->
 
-<!-- ════════ LIVE-VIEW ═══════════════════════════════════════════════ -->
-<div id="live-view" class="live-view">
-  <div class="group">
-    <div class="live-bigvalue">
-      <div class="live-phase" id="live-phase">Init</div>
-      <div class="live-time" id="live-time">00:00</div>
-      <div class="live-nextdrop" id="live-nextdrop">next drop in –</div>
-    </div>
-    <div class="live-axes" id="live-axes">
-      <div class="live-axis"><div class="ax-name">α</div><canvas data-ax="alpha"></canvas><div class="ax-val" data-ax-val="alpha">–</div></div>
-      <div class="live-axis"><div class="ax-name">β</div><canvas data-ax="beta"></canvas><div class="ax-val" data-ax-val="beta">–</div></div>
-      <div class="live-axis"><div class="ax-name">V</div><canvas data-ax="volume"></canvas><div class="ax-val" data-ax-val="volume">–</div></div>
-      <div class="live-axis"><div class="ax-name">C</div><canvas data-ax="carrier"></canvas><div class="ax-val" data-ax-val="carrier">–</div></div>
-      <div class="live-axis"><div class="ax-name">PF</div><canvas data-ax="pulse_frequency"></canvas><div class="ax-val" data-ax-val="pulse_frequency">–</div></div>
-      <div class="live-axis"><div class="ax-name">PW</div><canvas data-ax="pulse_width"></canvas><div class="ax-val" data-ax-val="pulse_width">–</div></div>
-      <div class="live-axis"><div class="ax-name">PR</div><canvas data-ax="pulse_rise_time"></canvas><div class="ax-val" data-ax-val="pulse_rise_time">–</div></div>
-    </div>
-    <div class="override-grid">
-      <button class="override-btn" data-act="pause">Pause</button>
-      <button class="override-btn" data-act="skip">Skip Phase</button>
-      <button class="override-btn" data-act="edge">Edge Now</button>
-      <button class="override-btn" data-act="boost">Boost</button>
-      <button class="override-btn danger" data-act="stop">STOP</button>
-    </div>
-  </div>
-</div>
-
 <script>
 (function() {
     const EXP_LABELS = {1:'Beginner',2:'Eingewöhnt',3:'Erfahren',4:'Routiniert',5:'Profi'};
@@ -506,17 +536,34 @@ h1 { font-size: 18px; color: #5af; font-weight: 500; margin-bottom: 14px; }
         }, 100);
     }
 
-    // ── START / Live-view switch ──────────────────────────────
-    const cfgView = document.getElementById('cfg-view');
+    // ── START / Live-view ──────────────────────────────────────
+    // Live-view is now a sticky top bar that appears IN ADDITION to the config,
+    // not in place of it. The config stays scrollable underneath.
     const liveView = document.getElementById('live-view');
+    const startBtn = document.getElementById('ss-start');
+    const startLabel = startBtn.textContent;
 
-    document.getElementById('ss-start').addEventListener('click', () => {
+    function setRunning(running) {
+        if (running) {
+            liveView.classList.add('active');
+            startBtn.classList.add('running');
+            startBtn.textContent = 'Session läuft …';
+            startBtn.disabled = true;
+        } else {
+            liveView.classList.remove('active');
+            startBtn.classList.remove('running');
+            startBtn.textContent = startLabel;
+            startBtn.disabled = false;
+        }
+    }
+
+    startBtn.addEventListener('click', () => {
+        if (startBtn.disabled) return;
         if (window.pywebview && window.pywebview.api &&
             typeof window.pywebview.api.start_session === 'function') {
             try { window.pywebview.api.start_session(getSessionProfile()); } catch (e) {}
         }
-        cfgView.style.display = 'none';
-        liveView.classList.add('active');
+        setRunning(true);
     });
 
     const overrideMap = {
@@ -535,8 +582,7 @@ h1 { font-size: 18px; color: #5af; font-weight: 500; margin-bottom: 14px; }
                 try { window.pywebview.api[apiName](); } catch (e) {}
             }
             if (act === 'stop') {
-                liveView.classList.remove('active');
-                cfgView.style.display = '';
+                setRunning(false);
             }
         });
     });
