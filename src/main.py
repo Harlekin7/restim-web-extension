@@ -245,6 +245,8 @@ class App:
         self._server = None
         self._live_bridge = None
         self._proxy = None
+        self._sidebar_loaded = False
+        self._pending_logs = []
         self._lan_ip = _lan_ip()
         self._current_site = os.environ.get("SITE", "faptap").lower()
         if self._current_site not in SITES:
@@ -343,6 +345,12 @@ class App:
     # ── Events ─────────────────────────────────────────────────────
 
     def _on_sidebar_loaded(self):
+        self._sidebar_loaded = True
+        # Flush any logs queued before the sidebar was ready
+        for msg in self._pending_logs:
+            escaped = msg.replace("\\", "\\\\").replace("'", "\\'")
+            self._sidebar_eval(f"appendLog('{escaped}')")
+        self._pending_logs.clear()
         self._sidebar_eval(
             f"setServerStatus('{FAKE_HANDY_HOST}:{FAKE_HANDY_PORT}', true)"
         )
@@ -427,6 +435,15 @@ class App:
         )
 
     def _log(self, msg):
+        # Always print to stdout so logs are visible from a terminal too
+        try:
+            print(f"[restim] {msg}", flush=True)
+        except Exception:
+            pass
+        # Sidebar may not be loaded yet during early startup — queue until it is.
+        if not self._sidebar_loaded:
+            self._pending_logs.append(msg)
+            return
         escaped = msg.replace("\\", "\\\\").replace("'", "\\'")
         self._sidebar_eval(f"appendLog('{escaped}')")
 

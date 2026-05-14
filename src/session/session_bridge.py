@@ -89,8 +89,12 @@ class SessionBridge:
             import time
             time.sleep(0.02)
 
-        # Connect TCode client (lazy import to avoid cycles)
-        from src.restim.tcode_client import TCodeClient
+        # Connect TCode client (lazy import to avoid cycles).
+        # Try both layouts so the module works whether run from repo root or src/.
+        try:
+            from restim.tcode_client import TCodeClient
+        except ImportError:
+            from src.restim.tcode_client import TCodeClient
         self._tcode_client = TCodeClient(url=self.restim_url, on_log=self._on_log)
         if self._loop is not None:
             asyncio.run_coroutine_threadsafe(self._tcode_client.connect(), self._loop)
