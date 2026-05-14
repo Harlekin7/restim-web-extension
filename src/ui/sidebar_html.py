@@ -1,8 +1,35 @@
-SIDEBAR_HTML = """<!DOCTYPE html>
+"""Sidebar HTML for the pywebview control panel.
+
+Supports four modes: FapTap / TheEdgy / Network / SESSION.
+
+In Session mode the sidebar shows only the mode switcher, server status, and
+log — the actual session configuration UI lives in the main browser window
+(see `src/ui/session_main.py`). The "Session" button in the switcher triggers
+`set_site('session')` which the Python backend uses to swap the browser-window
+HTML for the session UI.
+
+`SIDEBAR_HTML` is exported as a module-level string for backward compatibility
+with main.py — it is built once on import via `build_sidebar_html()`.
+"""
+from __future__ import annotations
+
+
+def build_sidebar_html() -> str:
+    return _SIDEBAR_TEMPLATE
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Template
+# ─────────────────────────────────────────────────────────────────────
+# The previous (non-session) layout is preserved verbatim. New SESSION
+# mode is gated by a single visibility-switch on body[data-mode].
+_SIDEBAR_TEMPLATE = r"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <style>
+/*__UPLOT_CSS__*/
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
         font-family: 'Segoe UI', Tahoma, sans-serif;
@@ -92,6 +119,19 @@ SIDEBAR_HTML = """<!DOCTYPE html>
     }
     .param-input:focus { border-color: #7af; }
 
+    /* Select dropdowns */
+    .param-select {
+        flex: 1;
+        background: #1a1a1a;
+        border: 1px solid #444;
+        border-radius: 3px;
+        color: #eee;
+        font-size: 11px;
+        padding: 3px 4px;
+        outline: none;
+    }
+    .param-select:focus { border-color: #7af; }
+
     /* Toggle button */
     .toggle-btn {
         background: #444;
@@ -149,9 +189,9 @@ SIDEBAR_HTML = """<!DOCTYPE html>
         border: 1px solid #3e3e3e;
         border-radius: 4px;
         color: #888;
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 600;
-        padding: 6px 10px;
+        padding: 6px 8px;
         cursor: pointer;
         text-transform: uppercase;
         letter-spacing: 0.5px;
@@ -162,17 +202,190 @@ SIDEBAR_HTML = """<!DOCTYPE html>
         color: #fff;
     }
     .site-btn:not(.active):hover { background: #3a3a3a; color: #ccc; }
+
+    /* ── SESSION-mode bits ── */
+
+    /* Hide all non-session groups when in session mode, and vice-versa. */
+    body[data-mode="session"] .non-session { display: none; }
+    body:not([data-mode="session"]) .session-only { display: none; }
+
+    .radio-row {
+        display: flex;
+        gap: 4px;
+        flex-wrap: wrap;
+    }
+    .radio-pill {
+        flex: 1;
+        min-width: 60px;
+        background: #2d2d2d;
+        border: 1px solid #3e3e3e;
+        color: #888;
+        font-size: 11px;
+        font-weight: 600;
+        padding: 5px 6px;
+        text-align: center;
+        cursor: pointer;
+        border-radius: 4px;
+        text-transform: capitalize;
+    }
+    .radio-pill.active {
+        background: #5a8;
+        border-color: #6b9;
+        color: #fff;
+    }
+    .radio-pill:not(.active):hover { background: #3a3a3a; color: #ccc; }
+
+    .bipolar-row {
+        display: grid;
+        grid-template-columns: 60px 1fr 60px;
+        align-items: center;
+        gap: 4px;
+        margin-bottom: 5px;
+        font-size: 10px;
+    }
+    .bipolar-row .pole-l { color: #aaa; text-align: left; }
+    .bipolar-row .pole-r { color: #aaa; text-align: right; }
+
+    .exp-display {
+        text-align: center;
+        font-size: 11px;
+        color: #ccc;
+        margin-top: 4px;
+        font-weight: 600;
+    }
+
+    .collapse-header {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+        user-select: none;
+    }
+    .collapse-arrow {
+        display: inline-block;
+        transition: transform 0.15s;
+        color: #888;
+        font-size: 9px;
+    }
+    .collapse-open .collapse-arrow { transform: rotate(90deg); }
+    .collapse-body { display: none; margin-top: 8px; }
+    .collapse-open .collapse-body { display: block; }
+
+    /* START / Override buttons */
+    .start-btn {
+        display: block;
+        width: 100%;
+        background: linear-gradient(180deg, #6b9 0%, #5a8 100%);
+        border: 1px solid #6b9;
+        color: #fff;
+        font-size: 14px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1.2px;
+        padding: 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        margin-top: 8px;
+    }
+    .start-btn:hover { background: linear-gradient(180deg, #7ca 0%, #6b9 100%); }
+    .start-btn.stop {
+        background: linear-gradient(180deg, #c55 0%, #a44 100%);
+        border-color: #c55;
+    }
+    .start-btn.stop:hover { background: linear-gradient(180deg, #d66 0%, #b55 100%); }
+
+    .override-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+        margin-top: 8px;
+    }
+    .override-btn {
+        background: #333;
+        border: 1px solid #444;
+        color: #ddd;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 10px;
+        border-radius: 5px;
+        cursor: pointer;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .override-btn:hover { background: #444; }
+    .override-btn.danger {
+        grid-column: 1 / -1;
+        background: #722;
+        border-color: #a33;
+        color: #fff;
+    }
+    .override-btn.danger:hover { background: #a44; }
+
+    /* Live-view */
+    .live-bigvalue {
+        text-align: center;
+        padding: 12px 8px;
+    }
+    .live-phase {
+        font-size: 18px;
+        font-weight: 700;
+        color: #fff;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+    }
+    .live-time {
+        font-size: 24px;
+        font-weight: 700;
+        color: #5a8;
+        font-family: Consolas, monospace;
+        margin-top: 4px;
+    }
+    .live-nextdrop {
+        font-size: 11px;
+        color: #aaa;
+        margin-top: 4px;
+    }
+    .live-axes {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 4px;
+        margin-top: 8px;
+    }
+    .live-axis {
+        background: #141414;
+        border: 1px solid #2a2a2a;
+        border-radius: 3px;
+        padding: 4px 2px;
+        text-align: center;
+    }
+    .live-axis .ax-name {
+        font-size: 8px;
+        color: #888;
+        text-transform: uppercase;
+    }
+    .live-axis canvas {
+        width: 100%;
+        height: 24px;
+        display: block;
+        margin: 2px 0;
+    }
+    .live-axis .ax-val {
+        font-size: 9px;
+        color: #ddd;
+        font-family: Consolas, monospace;
+    }
 </style>
 </head>
-<body>
+<body data-mode="faptap">
 
-<!-- Site switcher -->
+<!-- Mode / Site switcher -->
 <div class="group">
-    <div class="group-title">Website</div>
+    <div class="group-title">Mode</div>
     <div class="site-switcher">
         <button class="site-btn" data-site="faptap">FapTap</button>
         <button class="site-btn" data-site="theedgy">TheEdgy</button>
         <button class="site-btn" data-site="network">Network</button>
+        <button class="site-btn" data-site="session">Session</button>
     </div>
 </div>
 
@@ -186,7 +399,7 @@ SIDEBAR_HTML = """<!DOCTYPE html>
 </div>
 
 <!-- Network proxy target (only visible in network mode) -->
-<div class="group" id="group-network" style="display:none;">
+<div class="group non-session" id="group-network" style="display:none;">
     <div class="group-title">Network Target</div>
     <div class="site-switcher">
         <button class="site-btn target-btn" data-target="faptap">FapTap</button>
@@ -195,7 +408,7 @@ SIDEBAR_HTML = """<!DOCTYPE html>
 </div>
 
 <!-- TheEdgy live settings (only visible on theedgy) -->
-<div class="group" id="group-theedgy" style="display:none;">
+<div class="group non-session" id="group-theedgy" style="display:none;">
     <div class="group-title">TheEdgy Live</div>
     <div class="param-row">
         <span class="param-label">Max Speed</span>
@@ -208,6 +421,11 @@ SIDEBAR_HTML = """<!DOCTYPE html>
         <span class="param-val">%/s</span>
     </div>
 </div>
+
+<!-- Session-mode UI now lives in the main browser window — see src/ui/session_main.py.
+     The sidebar in Session mode shows only the mode switcher, server status, and log. -->
+
+<div class="non-session">
 
 <!-- Funscript -->
 <div class="group">
@@ -318,7 +536,7 @@ SIDEBAR_HTML = """<!DOCTYPE html>
 <div class="group">
     <div class="group-title">Pulse Settings</div>
 
-    <!-- Carrier Freq: 0-1 in Restim (scaled internally) -->
+    <!-- Carrier Freq -->
     <div class="param-row">
         <span class="param-label">CarFreq Min</span>
         <input type="range" class="param-range" id="s-car-min" min="0" max="1.0" step="0.05" value="0.80">
@@ -373,7 +591,9 @@ SIDEBAR_HTML = """<!DOCTYPE html>
     </div>
 </div>
 
-<!-- Log -->
+</div> <!-- /non-session -->
+
+<!-- Log (always visible) -->
 <div class="group">
     <div class="group-title">Log</div>
     <div id="log"></div>
@@ -442,22 +662,27 @@ SIDEBAR_HTML = """<!DOCTYPE html>
         });
     });
 
-    // ── Site switcher ─────────────────────────────────────────
+    // ── Mode / Site switcher ──────────────────────────────────
     var currentSite = 'faptap';
-    document.querySelectorAll('.site-btn').forEach(function(btn) {
+    document.querySelectorAll('.site-btn[data-site]').forEach(function(btn) {
         btn.addEventListener('click', function() {
             var site = btn.getAttribute('data-site');
             if (site === currentSite) return;
+            // All sites (including 'session') route through Python — backend
+            // decides which HTML to load into the main browser window.
             if (window.pywebview && window.pywebview.api && window.pywebview.api.set_site) {
                 window.pywebview.api.set_site(site).then(function(ok) {
                     if (ok) setActiveSite(site);
                 });
+            } else {
+                setActiveSite(site);
             }
         });
     });
 
     function setActiveSite(site) {
         currentSite = site;
+        document.body.setAttribute('data-mode', site);
         document.querySelectorAll('.site-btn[data-site]').forEach(function(b) {
             b.classList.toggle('active', b.getAttribute('data-site') === site);
         });
@@ -488,7 +713,7 @@ SIDEBAR_HTML = """<!DOCTYPE html>
         });
     }
 
-    // ── Collect all settings ──────────────────────────────────
+    // ── Collect all (legacy) settings ─────────────────────────
     function getSettings() {
         return {
             arc_degrees:      parseFloat(document.getElementById('s-arc').value),
@@ -576,7 +801,6 @@ SIDEBAR_HTML = """<!DOCTYPE html>
             } else {
                 var el = document.getElementById(m.id);
                 el.value = data[key];
-                // Update display label for sliders
                 if (m.type === 'slider' && sliders[m.id]) {
                     var cfg = sliders[m.id];
                     document.getElementById(cfg.val).textContent = cfg.fmt(data[key]);
@@ -641,12 +865,18 @@ SIDEBAR_HTML = """<!DOCTYPE html>
             if (count > 15) {
                 lines.push('  ... (' + (count - 15) + ' more) ...');
             }
-            document.getElementById('script-preview').textContent = lines.join('\\n');
+            document.getElementById('script-preview').textContent = lines.join('\n');
         } catch(e) {
             appendLog('Parse error: ' + e.message);
         }
     }
+
+    // Session-mode UI lives in the main browser window — no JS wiring needed here.
+    // See src/ui/session_main.py for the full session config + live view.
 </script>
 </body>
 </html>
 """
+
+# Materialised once at import time so callers can keep using `SIDEBAR_HTML`.
+SIDEBAR_HTML = build_sidebar_html()

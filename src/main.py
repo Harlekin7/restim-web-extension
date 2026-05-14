@@ -15,7 +15,9 @@ from pathlib import Path
 from fake_handy.server import FakeHandyServer
 from funscript.live_bridge import LiveBridge
 from proxy.server import ProxyServer
+from session.session_bridge import SessionBridge
 from ui.sidebar_html import SIDEBAR_HTML
+from ui.session_main import SESSION_MAIN_HTML
 from config import (
     DEFAULT_NETWORK_TARGET,
     FAKE_HANDY_HOST,
@@ -56,7 +58,12 @@ def _user_data_dir():
 
 
 class BrowserAPI:
-    """Python API exposed to the browser window via pywebview.api."""
+    """Python API exposed to the browser window via pywebview.api.
+
+    In Session mode the browser window hosts the session config UI, so the
+    Session-mode JS bridge methods live here too (in addition to in SidebarAPI
+    for backward compat / convenience).
+    """
 
     def __init__(self, app):
         self._app = app
@@ -72,6 +79,38 @@ class BrowserAPI:
         elif not enter and self._is_fullscreen:
             self._is_fullscreen = False
             w.toggle_fullscreen()
+
+    # ── Session-mode bridge methods (called by session_main.py JS) ──
+
+    def set_session_profile(self, profile_dict):
+        return self._app._session_bridge.set_session_profile(profile_dict)
+
+    def update_session_envelope(self, envelope_json_str):
+        return self._app._session_bridge.update_session_envelope(envelope_json_str)
+
+    def start_session(self, profile_dict=None):
+        return self._app._session_bridge.start_session(profile_dict)
+
+    def session_pause(self):
+        self._app._session_bridge.session_pause()
+
+    def session_resume(self):
+        self._app._session_bridge.session_resume()
+
+    def session_skip(self):
+        self._app._session_bridge.session_skip()
+
+    def session_edge_now(self):
+        self._app._session_bridge.session_edge_now()
+
+    def session_boost(self):
+        self._app._session_bridge.session_boost()
+
+    def session_stop(self):
+        self._app._session_bridge.session_stop()
+
+    def session_panic(self):
+        self._app._session_bridge.session_panic()
 
     def tcode_write(self, text):
         """Called from the browser's patched navigator.serial when theedgy
@@ -163,8 +202,12 @@ class SidebarAPI:
         return True
 
     def set_site(self, site):
-        if site not in SITES or site == self._app._current_site:
+        # "session" mode loads the session config UI into the main browser window.
+        if site == self._app._current_site:
             return False
+        if site != "session" and site not in SITES:
+            return False
+
         old = self._app._current_site
         self._app._current_site = site
         try:
@@ -175,16 +218,53 @@ class SidebarAPI:
                 self._app._proxy.stop()
 
             if self._app._browser_window:
-                if site == "network":
+                if site == "session":
+                    self._app._browser_window.load_html(SESSION_MAIN_HTML)
+                elif site == "network":
                     html = self._app._network_info_html()
                     self._app._browser_window.load_html(html)
                 else:
                     self._app._browser_window.load_url(SITES[site])
-            self._app._log(f"Site switched to {site}")
+            self._app._log(f"Mode: {site}")
         except Exception as e:
             self._app._log(f"Site switch error: {e}")
             return False
         return True
+
+    # ── Session-mode bridge proxy methods ─────────────────────────────────
+
+    def set_session_profile(self, profile_dict):
+        return self._app._session_bridge.set_session_profile(profile_dict)
+
+    def update_session_envelope(self, envelope_json_str):
+        return self._app._session_bridge.update_session_envelope(envelope_json_str)
+
+    def start_session(self, profile_dict=None):
+        return self._app._session_bridge.start_session(profile_dict)
+
+    def session_pause(self):
+        self._app._session_bridge.session_pause()
+
+    def session_resume(self):
+        self._app._session_bridge.session_resume()
+
+    def session_skip(self):
+        self._app._session_bridge.session_skip()
+
+    def session_edge_now(self):
+        self._app._session_bridge.session_edge_now()
+
+    def session_boost(self):
+        self._app._session_bridge.session_boost()
+
+    def session_stop(self):
+        self._app._session_bridge.session_stop()
+
+    def session_panic(self):
+        self._app._session_bridge.session_panic()
+
+    def session_is_running(self):
+        return self._app._session_bridge.is_running()
 
     def _save(self, data):
         try:
@@ -202,6 +282,8 @@ class App:
         self._server = None
         self._live_bridge = None
         self._proxy = None
+        self._sidebar_loaded = False
+        self._pending_logs = []
         self._lan_ip = _lan_ip()
         self._current_site = os.environ.get("SITE", "faptap").lower()
         if self._current_site not in SITES:
@@ -233,7 +315,16 @@ class App:
         )
 
         self._browser_api = BrowserAPI(self)
-        if self._current_site == "network":
+        if self._current_site == "session":
+            self._browser_window = webview.create_window(
+                title="Restim - Session",
+                html=SESSION_MAIN_HTML,
+                width=1100,
+                height=900,
+                resizable=True,
+                js_api=self._browser_api,
+            )
+        elif self._current_site == "network":
             self._browser_window = webview.create_window(
                 title="Restim - Browser (network)",
                 html=self._network_info_html(),
@@ -282,6 +373,14 @@ class App:
         if self._current_site == "network":
             self._proxy.start()
 
+        # Session-mode bridge (own asyncio loop, owns its TCode WS connection)
+        self._session_bridge = SessionBridge(
+            restim_url=RESTIM_WS_URL,
+            on_log=self._log,
+            on_status=self._on_session_status,
+        )
+        self._session_bridge.start()
+
         # pywebview events
         self._browser_window.events.loaded += self._on_browser_loaded
         self._sidebar_window.events.loaded += self._on_sidebar_loaded
@@ -292,6 +391,12 @@ class App:
     # ── Events ─────────────────────────────────────────────────────
 
     def _on_sidebar_loaded(self):
+        self._sidebar_loaded = True
+        # Flush any logs queued before the sidebar was ready
+        for msg in self._pending_logs:
+            escaped = msg.replace("\\", "\\\\").replace("'", "\\'")
+            self._sidebar_eval(f"appendLog('{escaped}')")
+        self._pending_logs.clear()
         self._sidebar_eval(
             f"setServerStatus('{FAKE_HANDY_HOST}:{FAKE_HANDY_PORT}', true)"
         )
@@ -302,8 +407,8 @@ class App:
         self._log("Fake Handy Server started")
 
     def _on_browser_loaded(self):
-        if self._current_site == "network":
-            return  # static info page, no JS injection needed
+        if self._current_site in ("network", "session"):
+            return  # static info / session page, no JS injection needed
         try:
             self._browser_window.evaluate_js(self._redirect_js)
             self._browser_window.evaluate_js(self._serial_js)
@@ -322,6 +427,32 @@ class App:
             self._log(f"Playback started (start={data.get('startTime', 0)}ms)")
         elif event == "stop":
             self._log("Playback stopped")
+
+    def _on_session_status(self, status):
+        """Called ~10 Hz by SessionRunner. Push axis values + phase to the
+        browser window (where the session UI lives now)."""
+        try:
+            axes = status.last_axes
+            t_frac = status.t_session_s / max(status.t_total_s, 1)
+            js_axes = (
+                f"if(typeof pushLiveAxes==='function'){{pushLiveAxes("
+                f"{json.dumps(axes)}, {t_frac:.4f});}}"
+            )
+            js_phase = (
+                f"if(typeof pushLivePhase==='function'){{pushLivePhase({{"
+                f"phase:'{status.current_phase}',"
+                f"remaining_s:{status.t_total_s - status.t_session_s:.1f},"
+                f"next_drop_s:{status.next_drop_in_s if status.next_drop_in_s else 'null'}"
+                f"}});}}"
+            )
+            try:
+                if self._browser_window:
+                    self._browser_window.evaluate_js(js_axes)
+                    self._browser_window.evaluate_js(js_phase)
+            except Exception:
+                pass
+        except Exception:
+            pass
 
     # ── Helpers ────────────────────────────────────────────────────
 
@@ -357,6 +488,15 @@ class App:
         )
 
     def _log(self, msg):
+        # Always print to stdout so logs are visible from a terminal too
+        try:
+            print(f"[restim] {msg}", flush=True)
+        except Exception:
+            pass
+        # Sidebar may not be loaded yet during early startup — queue until it is.
+        if not self._sidebar_loaded:
+            self._pending_logs.append(msg)
+            return
         escaped = msg.replace("\\", "\\\\").replace("'", "\\'")
         self._sidebar_eval(f"appendLog('{escaped}')")
 
