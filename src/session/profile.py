@@ -68,22 +68,25 @@ EXPERIENCE_CAPS: dict[ExperienceLevel, dict] = {
 
 
 # Character presets. Drive meso scheduler + micro renderer stochastics.
+# Slot durations + crossfades raised across the board after live feedback
+# that pattern transitions felt jittery. Crossfades now overlap more of
+# each slot so the listener spends most of the time in a smooth blend.
 CHARACTER_PRESETS: dict[Character, dict] = {
     Character.SANFT: dict(
         band_width=0.05,
         pattern_pool_size=10,
         surprises_per_minute=0.0,
-        pattern_duration_s=(15.0, 30.0),
-        crossfade_s=2.5,
+        pattern_duration_s=(20.0, 40.0),
+        crossfade_s=4.0,
         subwave_amplitude_scale=0.6,
-        subwave_period_scale=1.5,  # longer periods
+        subwave_period_scale=1.5,
     ),
     Character.LEBENDIG: dict(
         band_width=0.10,
         pattern_pool_size=25,
         surprises_per_minute=0.20,  # 1 per 5 min
-        pattern_duration_s=(8.0, 15.0),
-        crossfade_s=1.5,
+        pattern_duration_s=(12.0, 22.0),
+        crossfade_s=3.0,
         subwave_amplitude_scale=1.0,
         subwave_period_scale=1.0,
     ),
@@ -91,8 +94,8 @@ CHARACTER_PRESETS: dict[Character, dict] = {
         band_width=0.15,
         pattern_pool_size=40,
         surprises_per_minute=0.5,  # 1 per 2 min
-        pattern_duration_s=(5.0, 10.0),
-        crossfade_s=1.0,
+        pattern_duration_s=(8.0, 16.0),
+        crossfade_s=2.0,
         subwave_amplitude_scale=1.2,
         subwave_period_scale=0.7,
     ),
@@ -100,8 +103,8 @@ CHARACTER_PRESETS: dict[Character, dict] = {
         band_width=0.20,
         pattern_pool_size=999,  # unlimited
         surprises_per_minute=1.0,
-        pattern_duration_s=(3.0, 8.0),
-        crossfade_s=1.5,  # longer = more disorienting
+        pattern_duration_s=(5.0, 12.0),
+        crossfade_s=2.5,
         subwave_amplitude_scale=1.5,
         subwave_period_scale=0.5,
         allow_pattern_overshoot=True,

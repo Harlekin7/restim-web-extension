@@ -18,17 +18,17 @@ from .types import AxisName
 
 
 # Per-axis slew-rate limits (max change per second in normalized 0..1 units)
-# Tuned so smooth patterns + edges are unaffected, but pathological jumps are clamped.
-# Volume is tighter on UPWARD changes (onset-response protection) than DOWNWARD
-# (panic-relevant), see SafetyGuard.process for the asymmetry.
+# Tuned so smooth patterns + edges are unaffected, but jumps are clamped.
+# Lowered after live feedback that movements felt jittery — these caps
+# determine the "fastest-allowed" slope per sample, not the typical one.
 DEFAULT_SLEW_LIMITS_PER_S: dict[AxisName, float] = {
-    AxisName.ALPHA: 5.0,           # position can move fast (visual rotation needs this)
-    AxisName.BETA: 5.0,
-    AxisName.VOLUME: 1.0,          # 100%/s upward cap (still gentle — see ONSET_RAMP_S)
-    AxisName.CARRIER: 1.0,         # 1.0/s = full sweep in 1s, plenty
-    AxisName.PULSE_FREQUENCY: 2.0,
-    AxisName.PULSE_WIDTH: 1.5,
-    AxisName.PULSE_RISE_TIME: 2.0,
+    AxisName.ALPHA: 1.5,           # 0->100% in ~660ms — visible rotation, no zappel
+    AxisName.BETA: 1.5,
+    AxisName.VOLUME: 0.8,          # 0->100% in 1.25s
+    AxisName.CARRIER: 0.6,         # full carrier sweep in ~1.7s
+    AxisName.PULSE_FREQUENCY: 1.0,
+    AxisName.PULSE_WIDTH: 0.8,
+    AxisName.PULSE_RISE_TIME: 1.0,
 }
 
 # Onset ramp: first ONSET_RAMP_S seconds of any session, volume is hard-limited to a

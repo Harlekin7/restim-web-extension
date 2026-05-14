@@ -113,9 +113,9 @@ class PatternP3_CosineBeatLock:
     @staticmethod
     def render(t_local, slot, master, master_at, rng):
         n = len(t_local)
-        # Period 0.5..1.5s — pick from parameters or master.movement
-        period = float(slot.parameters.get("period_s", 0.7 + 0.6 * (1.0 - master.movement)))
-        period = max(0.4, min(1.6, period))
+        # Period 2..5s (slow visible motion, not zappy). Higher movement -> faster.
+        period = float(slot.parameters.get("period_s", 4.5 - 2.5 * master.movement))
+        period = max(1.5, min(6.0, period))
         f = 1.0 / period
         phase0 = float(slot.parameters.get("phase0", rng.uniform(0, 2 * np.pi)))
         a = 0.5 + 0.5 * np.cos(2 * np.pi * f * t_local + phase0)
@@ -244,8 +244,8 @@ class PatternP7_BetaLockPendulum:
     @staticmethod
     def render(t_local, slot, master, master_at, rng):
         n = len(t_local)
-        period = float(slot.parameters.get("period_s", 1.2))
-        f = 1.0 / max(0.3, period)
+        period = float(slot.parameters.get("period_s", 4.0))
+        f = 1.0 / max(1.0, period)
         a = 0.5 + 0.5 * np.sin(2 * np.pi * f * t_local)
         b = np.full(n, 0.5)
         return {AxisName.ALPHA: _safe(a), AxisName.BETA: _safe(b)}
@@ -272,10 +272,12 @@ class PatternP8_FullCircleRotation:
 
     @staticmethod
     def render(t_local, slot, master, master_at, rng):
-        period = float(slot.parameters.get("period_s", 1.5))
+        # Period 3..8s — slow visible rotation, scaled by movement (low=slow, high=fast)
+        default_period = 7.5 - 4.5 * master.movement
+        period = float(slot.parameters.get("period_s", default_period))
         radius = float(slot.parameters.get("radius", 0.5 + 0.4 * master.movement))
         radius = max(0.2, min(1.0, radius))
-        f = 1.0 / max(0.4, period)
+        f = 1.0 / max(2.0, period)
         phase0 = float(slot.parameters.get("phase0", rng.uniform(0, 2 * np.pi)))
         a, b = rotating_position(t_local, f, radius, phase0)
         return {AxisName.ALPHA: _safe(a), AxisName.BETA: _safe(b)}
@@ -302,8 +304,8 @@ class PatternP9_HalfCircleArc:
 
     @staticmethod
     def render(t_local, slot, master, master_at, rng):
-        period = float(slot.parameters.get("period_s", 1.2))
-        f = 1.0 / max(0.4, period)
+        period = float(slot.parameters.get("period_s", 5.0))
+        f = 1.0 / max(1.5, period)
         a = 0.5 + 0.45 * np.sin(2 * np.pi * f * t_local)
         b = 0.5 + 0.10 * np.cos(2 * np.pi * f * t_local)
         return {AxisName.ALPHA: _safe(a), AxisName.BETA: _safe(b)}
@@ -336,8 +338,8 @@ class PatternP10_OffsetHalfStroke:
         hi = float(slot.parameters.get("hi", 0.50))
         if slot.parameters.get("side", "low") == "high":
             lo, hi = 0.55, 0.90
-        period = float(slot.parameters.get("period_s", 1.0))
-        f = 1.0 / max(0.4, period)
+        period = float(slot.parameters.get("period_s", 4.0))
+        f = 1.0 / max(1.5, period)
         amp = (hi - lo) / 2.0
         mid = (hi + lo) / 2.0
         a = mid + amp * np.sin(2 * np.pi * f * t_local)
@@ -436,14 +438,14 @@ class PatternP13_BetaBuzzAlphaToggle:
 
     @staticmethod
     def render(t_local, slot, master, master_at, rng):
-        # alpha hard-toggle ~500ms
-        toggle_p = float(slot.parameters.get("toggle_period_s", 0.5))
+        # alpha hard-toggle (slowed from 500ms to 1.5s — was perceptibly jittery)
+        toggle_p = float(slot.parameters.get("toggle_period_s", 1.5))
         toggle = (np.floor(t_local / toggle_p) % 2 == 0).astype(float)
         a = 0.04 + 0.91 * toggle
-        # beta buzzing ~50Hz-ish but practically ~25Hz at 50Hz sample limit
-        # we use ~20-30Hz random-walk-ish sinusoid
-        buzz_f = float(slot.parameters.get("buzz_hz", 20.0))
-        b = 0.5 + 0.45 * np.sin(2 * np.pi * buzz_f * t_local + rng.uniform(0, 2 * np.pi))
+        # beta wobble — 20Hz on position was way too fast (the 50Hz TCode sample
+        # rate can't represent it cleanly anyway). Drop to ~2Hz subtle waver.
+        buzz_f = float(slot.parameters.get("buzz_hz", 2.0))
+        b = 0.5 + 0.30 * np.sin(2 * np.pi * buzz_f * t_local + rng.uniform(0, 2 * np.pi))
         return {AxisName.ALPHA: _safe(a), AxisName.BETA: _safe(b)}
 
 
@@ -468,8 +470,8 @@ class PatternP14_RotationWithDrift:
 
     @staticmethod
     def render(t_local, slot, master, master_at, rng):
-        f0 = float(slot.parameters.get("f_start_hz", 0.4))
-        f1 = float(slot.parameters.get("f_end_hz", 1.2))
+        f0 = float(slot.parameters.get("f_start_hz", 0.15))
+        f1 = float(slot.parameters.get("f_end_hz", 0.55))
         radius = float(slot.parameters.get("radius", 0.6))
         # integrate instantaneous frequency to get phase
         T = max(t_local[-1], 1e-6)
@@ -504,7 +506,8 @@ class PatternP15_BeatPhaseLock:
     def render(t_local, slot, master, master_at, rng):
         n = len(t_local)
         bpm = float(slot.parameters.get("bpm", 90.0))
-        ratio = float(slot.parameters.get("beat_ratio", 0.5))  # half-beat default
+        # quarter-beat default — half-beat (0.5) at typical BPM was too fast
+        ratio = float(slot.parameters.get("beat_ratio", 0.25))
         f = (bpm / 60.0) * ratio
         a = 0.5 + 0.5 * np.cos(2 * np.pi * f * t_local)
         b = np.full(n, 0.5)
