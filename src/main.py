@@ -15,6 +15,7 @@ from pathlib import Path
 from fake_handy.server import FakeHandyServer
 from funscript.live_bridge import LiveBridge
 from proxy.server import ProxyServer
+from session.session_bridge import SessionBridge
 from ui.sidebar_html import SIDEBAR_HTML
 from config import (
     DEFAULT_NETWORK_TARGET,
@@ -163,6 +164,13 @@ class SidebarAPI:
         return True
 
     def set_site(self, site):
+        # "session" is a UI-only mode toggle — the JS hides the browser-related panels
+        # and shows the session config + graph. No browser navigation needed.
+        if site == "session":
+            self._app._current_site = "session"
+            self._app._log("Mode: session (generative)")
+            return True
+
         if site not in SITES or site == self._app._current_site:
             return False
         old = self._app._current_site
@@ -185,6 +193,41 @@ class SidebarAPI:
             self._app._log(f"Site switch error: {e}")
             return False
         return True
+
+    # ── Session-mode bridge proxy methods ─────────────────────────────────
+
+    def set_session_profile(self, profile_dict):
+        return self._app._session_bridge.set_session_profile(profile_dict)
+
+    def update_session_envelope(self, envelope_json_str):
+        return self._app._session_bridge.update_session_envelope(envelope_json_str)
+
+    def start_session(self, profile_dict=None):
+        return self._app._session_bridge.start_session(profile_dict)
+
+    def session_pause(self):
+        self._app._session_bridge.session_pause()
+
+    def session_resume(self):
+        self._app._session_bridge.session_resume()
+
+    def session_skip(self):
+        self._app._session_bridge.session_skip()
+
+    def session_edge_now(self):
+        self._app._session_bridge.session_edge_now()
+
+    def session_boost(self):
+        self._app._session_bridge.session_boost()
+
+    def session_stop(self):
+        self._app._session_bridge.session_stop()
+
+    def session_panic(self):
+        self._app._session_bridge.session_panic()
+
+    def session_is_running(self):
+        return self._app._session_bridge.is_running()
 
     def _save(self, data):
         try:
@@ -282,6 +325,14 @@ class App:
         if self._current_site == "network":
             self._proxy.start()
 
+        # Session-mode bridge (own asyncio loop, owns its TCode WS connection)
+        self._session_bridge = SessionBridge(
+            restim_url=RESTIM_WS_URL,
+            on_log=self._log,
+            on_status=self._on_session_status,
+        )
+        self._session_bridge.start()
+
         # pywebview events
         self._browser_window.events.loaded += self._on_browser_loaded
         self._sidebar_window.events.loaded += self._on_sidebar_loaded
@@ -322,6 +373,25 @@ class App:
             self._log(f"Playback started (start={data.get('startTime', 0)}ms)")
         elif event == "stop":
             self._log("Playback stopped")
+
+    def _on_session_status(self, status):
+        """Called ~10 Hz by SessionRunner. Push axis values + phase to sidebar JS."""
+        try:
+            axes = status.last_axes
+            self._sidebar_eval(
+                f"if(typeof pushLiveAxes==='function'){{pushLiveAxes("
+                f"{json.dumps(axes)}, {status.t_session_s / max(status.t_total_s, 1):.4f}"
+                f");}}"
+            )
+            self._sidebar_eval(
+                f"if(typeof pushLivePhase==='function'){{pushLivePhase({{"
+                f"phase:'{status.current_phase}',"
+                f"remaining_s:{status.t_total_s - status.t_session_s:.1f},"
+                f"next_drop_s:{status.next_drop_in_s if status.next_drop_in_s else 'null'}"
+                f"}});}}"
+            )
+        except Exception:
+            pass
 
     # ── Helpers ────────────────────────────────────────────────────
 
