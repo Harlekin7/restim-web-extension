@@ -181,7 +181,10 @@ class MesoScheduler:
 
         slots: list[PatternSlot] = []
         recency_q: list[str] = []
-        recency_lockout = profile.advanced.pattern_repeat_lockout_s or (dur_max * 1.5)
+        # Recency-lockout: how long after a pattern was used should it be heavily
+        # penalised. Raised to dur_max * 4 so patterns stay out of rotation longer
+        # — the previous ~30s lockout caused obvious repetition.
+        recency_lockout = profile.advanced.pattern_repeat_lockout_s or (dur_max * 4.0)
 
         if require_full_coverage:
             t = 0.0
@@ -344,10 +347,13 @@ class MesoScheduler:
             # Compatibility with last
             if last_id is not None:
                 w *= max(0.1, compatibility_score(last_id, m.id))
-            # Recency penalty
+            # Recency penalty — heavier than before (was 0.1 + 0.9*idx/len).
+            # idx=0 means "most recently used" — drop weight to ~2% so it's
+            # extremely unlikely to come back immediately. Linear ramp back to
+            # full only after the full recency window has passed.
             if m.id in recency:
                 idx = recency.index(m.id)
-                penalty = 0.1 + (0.9 * idx / max(len(recency), 1))
+                penalty = 0.02 + (0.5 * idx / max(len(recency) - 1, 1))
                 w *= penalty
 
             weights.append(w)

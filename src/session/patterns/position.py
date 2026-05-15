@@ -73,11 +73,11 @@ class PatternP2_StaticCenter:
         name="Static Center",
         category=PatternCategory.POSITION,
         axes_used=(AxisName.ALPHA, AxisName.BETA),
-        duration_range_s=(3.0, 30.0),
+        duration_range_s=(3.0, 12.0),  # cap shorter — never lingers long
         suitable_phases=(PhaseName.INIT, PhaseName.EDGE),
-        style_affinity={
-            "sanfter_aufbau": 1.4, "endlos_tease": 1.3,
-            "edging": 1.2, "crescendo": 0.5, "beat_drop": 0.3, "ruin": 0.4,
+        style_affinity={  # rare across the board — too sensation-less for most styles
+            "endlos_tease": 0.5, "edging": 0.4, "sanfter_aufbau": 0.5,
+            "crescendo": 0.2, "beat_drop": 0.1, "ruin": 0.15,
         },
     ))
 
@@ -119,7 +119,9 @@ class PatternP3_CosineBeatLock:
         f = 1.0 / period
         phase0 = float(slot.parameters.get("phase0", rng.uniform(0, 2 * np.pi)))
         a = 0.5 + 0.5 * np.cos(2 * np.pi * f * t_local + phase0)
-        b = np.full(n, 0.5)
+        # Add a small lagging beta wobble so the rotation traces a tilted figure-8
+        # instead of a flat horizontal line through the center.
+        b = 0.5 + 0.25 * np.sin(2 * np.pi * f * t_local + phase0 + np.pi / 3)
         return {AxisName.ALPHA: _safe(a), AxisName.BETA: _safe(b)}
 
 
@@ -247,7 +249,8 @@ class PatternP7_BetaLockPendulum:
         period = float(slot.parameters.get("period_s", 4.0))
         f = 1.0 / max(1.0, period)
         a = 0.5 + 0.5 * np.sin(2 * np.pi * f * t_local)
-        b = np.full(n, 0.5)
+        # Slow beta drift so the trajectory traces a wide ellipse, not a flat line
+        b = 0.5 + 0.30 * np.cos(2 * np.pi * f * 0.5 * t_local)
         return {AxisName.ALPHA: _safe(a), AxisName.BETA: _safe(b)}
 
 
@@ -343,7 +346,8 @@ class PatternP10_OffsetHalfStroke:
         amp = (hi - lo) / 2.0
         mid = (hi + lo) / 2.0
         a = mid + amp * np.sin(2 * np.pi * f * t_local)
-        b = np.full(n, 0.5)
+        # Wide beta arc so the offset half-stroke doesn't sit on a single horizontal line
+        b = 0.5 + 0.30 * np.cos(2 * np.pi * f * t_local + np.pi / 4)
         return {AxisName.ALPHA: _safe(a), AxisName.BETA: _safe(b)}
 
 
@@ -358,11 +362,11 @@ class PatternP11_MicroJitter:
         name="Micro Jitter",
         category=PatternCategory.POSITION,
         axes_used=(AxisName.ALPHA, AxisName.BETA),
-        duration_range_s=(3.0, 30.0),
+        duration_range_s=(3.0, 12.0),  # short bursts only
         suitable_phases=(PhaseName.PLATEAU, PhaseName.EDGE, PhaseName.CLIMAX),
-        style_affinity={
-            "endlos_tease": 1.5, "edging": 1.3, "ruin": 1.2,
-            "crescendo": 1.0, "sanfter_aufbau": 0.9, "beat_drop": 0.6,
+        style_affinity={  # niche — only as accent, never as main pattern
+            "endlos_tease": 0.7, "edging": 0.7, "ruin": 0.5,
+            "crescendo": 0.4, "sanfter_aufbau": 0.4, "beat_drop": 0.3,
         },
     ))
 
@@ -413,7 +417,9 @@ class PatternP12_StepClimb:
         seq = np.array(seq)
         idx = np.clip((t_local / max(t_local[-1], 1e-6) * len(seq)).astype(int), 0, len(seq) - 1)
         a = seq[idx]
-        b = np.full(n, 0.5)
+        # Couple beta to a slow rotation across the steps so the climb sweeps an arc
+        T = max(t_local[-1], 1e-6)
+        b = 0.5 + 0.35 * np.sin(np.pi * t_local / T)
         return {AxisName.ALPHA: _safe(a), AxisName.BETA: _safe(b)}
 
 
@@ -510,7 +516,8 @@ class PatternP15_BeatPhaseLock:
         ratio = float(slot.parameters.get("beat_ratio", 0.25))
         f = (bpm / 60.0) * ratio
         a = 0.5 + 0.5 * np.cos(2 * np.pi * f * t_local)
-        b = np.full(n, 0.5)
+        # Beta locked to alpha at +90° so the beat traces a circle
+        b = 0.5 + 0.35 * np.sin(2 * np.pi * f * t_local)
         return {AxisName.ALPHA: _safe(a), AxisName.BETA: _safe(b)}
 
 
