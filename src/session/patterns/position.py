@@ -13,6 +13,7 @@ from ..pattern_base import (
     MasterContext,
     PatternMetadata,
     PatternSlot,
+    ou_process,
     perlin_like,
     rotating_position,
     slew_smooth,
@@ -674,6 +675,448 @@ class PatternP19_TriadicStepCycle:
         return {AxisName.ALPHA: _safe(a_out), AxisName.BETA: _safe(b_out)}
 
 
+# =====================================================================
+# Restim-derived patterns (ports from references/restim/qt_ui/patterns/threephase/)
+# Convention: Restim returns (x, y) in [-1, +1] around a center; we map to
+#             alpha = 0.5 + 0.5*x, beta = 0.5 + 0.5*y
+# =====================================================================
+
+def _to_unit(x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Convert Restim's [-1,+1] coords to our [0,1] alpha/beta."""
+    return _safe(0.5 + 0.5 * x), _safe(0.5 + 0.5 * y)
+
+
+@dataclass
+class PatternP20_RestimCircle:
+    """Smooth full circle (port of Restim's CirclePattern)."""
+    metadata: PatternMetadata = field(default_factory=lambda: PatternMetadata(
+        id="P20", name="Restim Circle", category=PatternCategory.POSITION,
+        axes_used=(AxisName.ALPHA, AxisName.BETA),
+        duration_range_s=(8.0, 60.0),
+        suitable_phases=(PhaseName.BUILD, PhaseName.PLATEAU, PhaseName.EDGE, PhaseName.CLIMAX),
+        style_affinity={"endlos_tease": 1.4, "sanfter_aufbau": 1.4, "edging": 1.3,
+                        "crescendo": 1.2, "ruin": 1.0, "beat_drop": 0.9},
+    ))
+
+    @staticmethod
+    def render(t_local, slot, master, master_at, rng):
+        velocity = float(slot.parameters.get("velocity", 0.4 + 0.4 * master.movement))
+        amp = float(slot.parameters.get("amplitude", 0.6 + 0.3 * master.movement))
+        phase0 = rng.uniform(0, 2 * np.pi)
+        x = amp * np.cos(velocity * t_local + phase0)
+        y = amp * np.sin(velocity * t_local + phase0)
+        return dict(zip([AxisName.ALPHA, AxisName.BETA], _to_unit(x, y)))
+
+
+@dataclass
+class PatternP21_FigureEight:
+    """Figure-8 (port of Restim's FigureEightPattern)."""
+    metadata: PatternMetadata = field(default_factory=lambda: PatternMetadata(
+        id="P21", name="Figure 8", category=PatternCategory.POSITION,
+        axes_used=(AxisName.ALPHA, AxisName.BETA),
+        duration_range_s=(8.0, 45.0),
+        suitable_phases=(PhaseName.BUILD, PhaseName.PLATEAU, PhaseName.EDGE),
+        style_affinity={"endlos_tease": 1.5, "edging": 1.4, "sanfter_aufbau": 1.3,
+                        "crescendo": 1.2, "ruin": 1.0, "beat_drop": 1.0},
+    ))
+
+    @staticmethod
+    def render(t_local, slot, master, master_at, rng):
+        velocity = float(slot.parameters.get("velocity", 0.5 + 0.4 * master.movement))
+        amp = float(slot.parameters.get("amplitude", 0.7))
+        ang = velocity * t_local + rng.uniform(0, 2 * np.pi)
+        y = np.sin(ang) * amp
+        x = 0.5 * np.sin(2 * ang) * amp
+        return dict(zip([AxisName.ALPHA, AxisName.BETA], _to_unit(x, y)))
+
+
+@dataclass
+class PatternP22_MicroCircles:
+    """Tiny circles drifting around inside the unit (port of MicroCirclesPattern)."""
+    metadata: PatternMetadata = field(default_factory=lambda: PatternMetadata(
+        id="P22", name="Micro Circles", category=PatternCategory.POSITION,
+        axes_used=(AxisName.ALPHA, AxisName.BETA),
+        duration_range_s=(10.0, 60.0),
+        suitable_phases=(PhaseName.PLATEAU, PhaseName.EDGE),
+        style_affinity={"edging": 1.6, "endlos_tease": 1.5, "sanfter_aufbau": 1.3,
+                        "ruin": 1.0, "crescendo": 0.9, "beat_drop": 0.7},
+    ))
+
+    @staticmethod
+    def render(t_local, slot, master, master_at, rng):
+        velocity = float(slot.parameters.get("velocity", 0.5))
+        circle_r = float(slot.parameters.get("circle_radius", 0.18))
+        t = velocity * t_local
+        # Slow drift of the micro-circle origin
+        ox = 0.4 * np.sin(t * 0.1) + 0.3 * np.sin(t * 0.07)
+        oy = 0.3 * np.cos(t * 0.08) + 0.2 * np.cos(t * 0.12)
+        # Small circular motion around the drifting origin (but not too fast)
+        size_mod = 0.8 + 0.4 * np.sin(t * 0.3)
+        cx = circle_r * np.cos(t * 1.3) * size_mod
+        cy = circle_r * np.sin(t * 1.3) * size_mod
+        x = ox + cx
+        y = oy + cy
+        return dict(zip([AxisName.ALPHA, AxisName.BETA], _to_unit(x, y)))
+
+
+@dataclass
+class PatternP23_TriPhasePanning:
+    """Triphase panning (port of PanningPattern1) — sweeps along the 120° arc."""
+    metadata: PatternMetadata = field(default_factory=lambda: PatternMetadata(
+        id="P23", name="Tri-Phase Panning", category=PatternCategory.POSITION,
+        axes_used=(AxisName.ALPHA, AxisName.BETA),
+        duration_range_s=(10.0, 60.0),
+        suitable_phases=(PhaseName.BUILD, PhaseName.PLATEAU, PhaseName.EDGE),
+        style_affinity={"endlos_tease": 1.6, "sanfter_aufbau": 1.5, "edging": 1.4,
+                        "crescendo": 1.2, "beat_drop": 1.0, "ruin": 1.0},
+    ))
+
+    @staticmethod
+    def render(t_local, slot, master, master_at, rng):
+        velocity = float(slot.parameters.get("velocity", 0.15 + 0.15 * master.movement))
+        amp = float(slot.parameters.get("amplitude", 0.85))
+        t = velocity * t_local + rng.uniform(0, 2 * np.pi)
+        base = np.sin(2 * np.pi * t) * (np.pi * 120 / 180)  # ~±2.09 rad sweep
+        x = np.cos(base) * amp
+        y = np.sin(base) * amp
+        return dict(zip([AxisName.ALPHA, AxisName.BETA], _to_unit(x, y)))
+
+
+@dataclass
+class PatternP24_VerticalOscillation:
+    """Slow alpha sweep + faster beta wobble (port of VerticalOscillation)."""
+    metadata: PatternMetadata = field(default_factory=lambda: PatternMetadata(
+        id="P24", name="Vertical Oscillation", category=PatternCategory.POSITION,
+        axes_used=(AxisName.ALPHA, AxisName.BETA),
+        duration_range_s=(8.0, 40.0),
+        suitable_phases=(PhaseName.PLATEAU, PhaseName.EDGE, PhaseName.CLIMAX),
+        style_affinity={"crescendo": 1.4, "edging": 1.3, "endlos_tease": 1.2,
+                        "ruin": 1.2, "sanfter_aufbau": 1.0, "beat_drop": 1.1},
+    ))
+
+    @staticmethod
+    def render(t_local, slot, master, master_at, rng):
+        velocity = float(slot.parameters.get("velocity", 0.4))
+        t = velocity * t_local
+        x = np.sin(2 * np.pi * 0.25 * t) * 0.85          # slow main motion
+        y = 0.20 * np.sin(2 * np.pi * 1.5 * t)           # gentle wobble (was 5Hz)
+        return dict(zip([AxisName.ALPHA, AxisName.BETA], _to_unit(x, y)))
+
+
+@dataclass
+class PatternP25_DeepThrob:
+    """Deep slow throb (port of DeepThrobPattern, simplified)."""
+    metadata: PatternMetadata = field(default_factory=lambda: PatternMetadata(
+        id="P25", name="Deep Throb", category=PatternCategory.POSITION,
+        axes_used=(AxisName.ALPHA, AxisName.BETA),
+        duration_range_s=(15.0, 90.0),
+        suitable_phases=(PhaseName.PLATEAU, PhaseName.EDGE),
+        style_affinity={"edging": 1.6, "endlos_tease": 1.5, "sanfter_aufbau": 1.4,
+                        "crescendo": 1.1, "ruin": 1.1, "beat_drop": 0.7},
+    ))
+
+    @staticmethod
+    def render(t_local, slot, master, master_at, rng):
+        velocity = float(slot.parameters.get("velocity", 0.4))
+        t = velocity * t_local * 0.4
+        cycle = (t * 0.8) % (2 * np.pi)
+        # Smooth raised-cosine throb
+        intensity = np.where(cycle < np.pi,
+                             np.sin(cycle / np.pi * np.pi) ** 2,
+                             (1.0 - (cycle - np.pi) / np.pi) ** 2)
+        x = -0.20 + 1.10 * intensity  # extends from a bit negative to ~+0.9
+        y = 0.10 * np.sin(t * 0.6) + 0.05 * np.sin(t * 1.1)
+        return dict(zip([AxisName.ALPHA, AxisName.BETA], _to_unit(x, y)))
+
+
+@dataclass
+class PatternP26_RoseCurve:
+    """5-petal rose (port of RoseCurvePattern)."""
+    metadata: PatternMetadata = field(default_factory=lambda: PatternMetadata(
+        id="P26", name="Rose Curve", category=PatternCategory.POSITION,
+        axes_used=(AxisName.ALPHA, AxisName.BETA),
+        duration_range_s=(15.0, 90.0),
+        suitable_phases=(PhaseName.PLATEAU, PhaseName.EDGE, PhaseName.CLIMAX),
+        style_affinity={"endlos_tease": 1.6, "edging": 1.4, "crescendo": 1.3,
+                        "sanfter_aufbau": 1.2, "ruin": 1.0, "beat_drop": 0.8},
+    ))
+
+    @staticmethod
+    def render(t_local, slot, master, master_at, rng):
+        velocity = float(slot.parameters.get("velocity", 0.25 + 0.15 * master.movement))
+        n = float(slot.parameters.get("petals", 5))
+        amp = float(slot.parameters.get("amplitude", 0.8))
+        theta = velocity * t_local + rng.uniform(0, 2 * np.pi)
+        r = np.abs(np.cos(n * theta))
+        x = r * np.cos(theta) * amp
+        y = r * np.sin(theta) * amp
+        return dict(zip([AxisName.ALPHA, AxisName.BETA], _to_unit(x, y)))
+
+
+@dataclass
+class PatternP27_RandomWalk:
+    """Bounded random walk with center-pull (port of RandomWalkPattern)."""
+    metadata: PatternMetadata = field(default_factory=lambda: PatternMetadata(
+        id="P27", name="Random Walk", category=PatternCategory.POSITION,
+        axes_used=(AxisName.ALPHA, AxisName.BETA),
+        duration_range_s=(10.0, 45.0),
+        suitable_phases=(PhaseName.PLATEAU, PhaseName.EDGE),
+        style_affinity={"endlos_tease": 1.4, "edging": 1.3, "ruin": 1.2,
+                        "sanfter_aufbau": 1.1, "crescendo": 1.0, "beat_drop": 0.6},
+    ))
+
+    @staticmethod
+    def render(t_local, slot, master, master_at, rng):
+        velocity = float(slot.parameters.get("velocity", 0.4))
+        n = len(t_local)
+        # Generate via OU process for smooth bounded random walk
+        x = ou_process(n, dt=_dt_from(t_local), mean=0.0, sigma=0.5 * velocity,
+                       theta=0.4, rng=rng) * 0.7
+        y = ou_process(n, dt=_dt_from(t_local), mean=0.0, sigma=0.5 * velocity,
+                       theta=0.4, rng=rng) * 0.7
+        x = np.clip(x, -1.0, 1.0)
+        y = np.clip(y, -1.0, 1.0)
+        return dict(zip([AxisName.ALPHA, AxisName.BETA], _to_unit(x, y)))
+
+
+@dataclass
+class PatternP28_Spirograph:
+    """Inner-circle inside outer-circle (Restim Spirograph, simplified)."""
+    metadata: PatternMetadata = field(default_factory=lambda: PatternMetadata(
+        id="P28", name="Spirograph", category=PatternCategory.POSITION,
+        axes_used=(AxisName.ALPHA, AxisName.BETA),
+        duration_range_s=(15.0, 90.0),
+        suitable_phases=(PhaseName.PLATEAU, PhaseName.EDGE),
+        style_affinity={"endlos_tease": 1.5, "edging": 1.3, "sanfter_aufbau": 1.2,
+                        "crescendo": 1.1, "beat_drop": 0.9, "ruin": 1.0},
+    ))
+
+    @staticmethod
+    def render(t_local, slot, master, master_at, rng):
+        velocity = float(slot.parameters.get("velocity", 0.3))
+        R = float(slot.parameters.get("R", 0.6))
+        r = float(slot.parameters.get("r", 0.20))
+        d = float(slot.parameters.get("d", 0.25))
+        t = velocity * t_local + rng.uniform(0, 2 * np.pi)
+        x = (R - r) * np.cos(t) + d * np.cos((R - r) / r * t)
+        y = (R - r) * np.sin(t) - d * np.sin((R - r) / r * t)
+        return dict(zip([AxisName.ALPHA, AxisName.BETA], _to_unit(x, y)))
+
+
+@dataclass
+class PatternP29_TremorCircle:
+    """Circle with small tremor on top (port of TremorCirclePattern)."""
+    metadata: PatternMetadata = field(default_factory=lambda: PatternMetadata(
+        id="P29", name="Tremor Circle", category=PatternCategory.POSITION,
+        axes_used=(AxisName.ALPHA, AxisName.BETA),
+        duration_range_s=(8.0, 40.0),
+        suitable_phases=(PhaseName.PLATEAU, PhaseName.EDGE, PhaseName.CLIMAX),
+        style_affinity={"edging": 1.4, "ruin": 1.3, "endlos_tease": 1.2,
+                        "crescendo": 1.1, "beat_drop": 1.0, "sanfter_aufbau": 0.8},
+    ))
+
+    @staticmethod
+    def render(t_local, slot, master, master_at, rng):
+        velocity = float(slot.parameters.get("velocity", 0.4))
+        amp = float(slot.parameters.get("amplitude", 0.55))
+        t = velocity * t_local + rng.uniform(0, 2 * np.pi)
+        cx = amp * np.cos(t)
+        cy = amp * np.sin(t)
+        # Tiny tremor (~3Hz, 3% amplitude)
+        tx = 0.03 * np.sin(2 * np.pi * 3.0 * t_local)
+        ty = 0.03 * np.cos(2 * np.pi * 3.0 * t_local + 1.0)
+        x = cx + tx
+        y = cy + ty
+        return dict(zip([AxisName.ALPHA, AxisName.BETA], _to_unit(x, y)))
+
+
+@dataclass
+class PatternP30_WShape:
+    """W-shape sweep (port of WShapePattern)."""
+    metadata: PatternMetadata = field(default_factory=lambda: PatternMetadata(
+        id="P30", name="W-Shape Sweep", category=PatternCategory.POSITION,
+        axes_used=(AxisName.ALPHA, AxisName.BETA),
+        duration_range_s=(10.0, 40.0),
+        suitable_phases=(PhaseName.BUILD, PhaseName.PLATEAU, PhaseName.EDGE),
+        style_affinity={"crescendo": 1.5, "beat_drop": 1.4, "ruin": 1.3,
+                        "edging": 1.0, "endlos_tease": 0.9, "sanfter_aufbau": 0.8},
+    ))
+
+    @staticmethod
+    def render(t_local, slot, master, master_at, rng):
+        velocity = float(slot.parameters.get("velocity", 0.4))
+        amp = float(slot.parameters.get("amplitude", 0.85))
+        t = (velocity * t_local) % (4 * np.pi)
+        # Triangular sawtooth on alpha + sweep on beta
+        x = 1.0 - (np.abs(((t / (2 * np.pi) * 4) % 4) - 2) - 0)  # tent function
+        y = np.sin(t * 0.5) * 0.6
+        return dict(zip([AxisName.ALPHA, AxisName.BETA], _to_unit(x * amp, y * amp)))
+
+
+# =====================================================================
+# Edge-of-pole patterns: small angular oscillations *at* an electrode
+# These are exactly what the user asked for: "directly at the edge of one
+# electrode, just a few degrees left/right oscillation". The stim stays
+# clearly *on* one pole but micro-modulates around it.
+# =====================================================================
+
+def _polar_at_pole(pole: tuple[float, float], radial: float, angular_offset: float
+                   ) -> tuple[float, float]:
+    """Return (x_unit, y_unit) at offset (radial, angular) from a pole.
+
+    pole is given in our [0,1] coords. The angular_offset rotates the radial
+    direction around the center (0.5, 0.5)."""
+    cx, cy = pole[0] - 0.5, pole[1] - 0.5
+    pole_angle = np.arctan2(cy, cx)
+    pole_r = (cx * cx + cy * cy) ** 0.5
+    new_r = pole_r + radial
+    new_angle = pole_angle + angular_offset
+    x = 0.5 + new_r * np.cos(new_angle)
+    y = 0.5 + new_r * np.sin(new_angle)
+    return x, y
+
+
+@dataclass
+class PatternP31_EdgeWobbleNeutral:
+    """Tiny ±5° angular wobble *on* the Neutral electrode."""
+    metadata: PatternMetadata = field(default_factory=lambda: PatternMetadata(
+        id="P31", name="Edge Wobble Neutral", category=PatternCategory.POSITION,
+        axes_used=(AxisName.ALPHA, AxisName.BETA),
+        duration_range_s=(8.0, 40.0),
+        suitable_phases=(PhaseName.PLATEAU, PhaseName.EDGE, PhaseName.CLIMAX),
+        style_affinity={"edging": 1.7, "endlos_tease": 1.6, "sanfter_aufbau": 1.4,
+                        "crescendo": 1.3, "ruin": 1.2, "beat_drop": 1.0},
+    ))
+
+    @staticmethod
+    def render(t_local, slot, master, master_at, rng):
+        # 5° = 0.087 rad. Multiplied by master.movement so Wandernd-slider matters.
+        wobble_amp = float(slot.parameters.get("wobble_rad",
+                                               np.deg2rad(3.0 + 7.0 * master.movement)))
+        velocity = float(slot.parameters.get("velocity", 0.25 + 0.20 * master.movement))
+        offset = wobble_amp * np.sin(2 * np.pi * velocity * t_local)
+        # vectorised polar offset around Neutral pole
+        cx, cy = _NEUTRAL_POLE[0] - 0.5, _NEUTRAL_POLE[1] - 0.5
+        pole_r = (cx * cx + cy * cy) ** 0.5
+        pole_angle = np.arctan2(cy, cx)
+        new_angle = pole_angle + offset
+        x = 0.5 + pole_r * np.cos(new_angle)
+        y = 0.5 + pole_r * np.sin(new_angle)
+        return {AxisName.ALPHA: _safe(x), AxisName.BETA: _safe(y)}
+
+
+@dataclass
+class PatternP32_EdgeWobbleLeft:
+    """Tiny ±5° angular wobble *on* the Left electrode."""
+    metadata: PatternMetadata = field(default_factory=lambda: PatternMetadata(
+        id="P32", name="Edge Wobble Left", category=PatternCategory.POSITION,
+        axes_used=(AxisName.ALPHA, AxisName.BETA),
+        duration_range_s=(8.0, 40.0),
+        suitable_phases=(PhaseName.PLATEAU, PhaseName.EDGE, PhaseName.CLIMAX),
+        style_affinity={"edging": 1.7, "endlos_tease": 1.6, "sanfter_aufbau": 1.4,
+                        "crescendo": 1.3, "ruin": 1.2, "beat_drop": 1.0},
+    ))
+
+    @staticmethod
+    def render(t_local, slot, master, master_at, rng):
+        wobble_amp = float(slot.parameters.get("wobble_rad",
+                                               np.deg2rad(3.0 + 7.0 * master.movement)))
+        velocity = float(slot.parameters.get("velocity", 0.25 + 0.20 * master.movement))
+        offset = wobble_amp * np.sin(2 * np.pi * velocity * t_local)
+        cx, cy = _LEFT_POLE[0] - 0.5, _LEFT_POLE[1] - 0.5
+        pole_r = (cx * cx + cy * cy) ** 0.5
+        pole_angle = np.arctan2(cy, cx)
+        new_angle = pole_angle + offset
+        x = 0.5 + pole_r * np.cos(new_angle)
+        y = 0.5 + pole_r * np.sin(new_angle)
+        return {AxisName.ALPHA: _safe(x), AxisName.BETA: _safe(y)}
+
+
+@dataclass
+class PatternP33_EdgeWobbleRight:
+    """Tiny ±5° angular wobble *on* the Right electrode."""
+    metadata: PatternMetadata = field(default_factory=lambda: PatternMetadata(
+        id="P33", name="Edge Wobble Right", category=PatternCategory.POSITION,
+        axes_used=(AxisName.ALPHA, AxisName.BETA),
+        duration_range_s=(8.0, 40.0),
+        suitable_phases=(PhaseName.PLATEAU, PhaseName.EDGE, PhaseName.CLIMAX),
+        style_affinity={"edging": 1.7, "endlos_tease": 1.6, "sanfter_aufbau": 1.4,
+                        "crescendo": 1.3, "ruin": 1.2, "beat_drop": 1.0},
+    ))
+
+    @staticmethod
+    def render(t_local, slot, master, master_at, rng):
+        wobble_amp = float(slot.parameters.get("wobble_rad",
+                                               np.deg2rad(3.0 + 7.0 * master.movement)))
+        velocity = float(slot.parameters.get("velocity", 0.25 + 0.20 * master.movement))
+        offset = wobble_amp * np.sin(2 * np.pi * velocity * t_local)
+        cx, cy = _RIGHT_POLE[0] - 0.5, _RIGHT_POLE[1] - 0.5
+        pole_r = (cx * cx + cy * cy) ** 0.5
+        pole_angle = np.arctan2(cy, cx)
+        new_angle = pole_angle + offset
+        x = 0.5 + pole_r * np.cos(new_angle)
+        y = 0.5 + pole_r * np.sin(new_angle)
+        return {AxisName.ALPHA: _safe(x), AxisName.BETA: _safe(y)}
+
+
+@dataclass
+class PatternP34_TwoPoleTease:
+    """Slow oscillation between two adjacent poles, never touching the third."""
+    metadata: PatternMetadata = field(default_factory=lambda: PatternMetadata(
+        id="P34", name="Two-Pole Tease", category=PatternCategory.POSITION,
+        axes_used=(AxisName.ALPHA, AxisName.BETA),
+        duration_range_s=(10.0, 60.0),
+        suitable_phases=(PhaseName.PLATEAU, PhaseName.EDGE),
+        style_affinity={"edging": 1.7, "endlos_tease": 1.6, "sanfter_aufbau": 1.3,
+                        "crescendo": 1.2, "ruin": 1.0, "beat_drop": 0.9},
+    ))
+
+    @staticmethod
+    def render(t_local, slot, master, master_at, rng):
+        # Pick two of the three poles randomly (per slot, deterministically via rng)
+        pair_idx = int(rng.integers(0, 3))
+        pairs = [(_NEUTRAL_POLE, _LEFT_POLE),
+                 (_LEFT_POLE, _RIGHT_POLE),
+                 (_RIGHT_POLE, _NEUTRAL_POLE)]
+        p1, p2 = pairs[pair_idx]
+        # Slow ease-in-out between p1 and p2
+        velocity = float(slot.parameters.get("velocity", 0.10 + 0.10 * master.movement))
+        u = 0.5 - 0.5 * np.cos(2 * np.pi * velocity * t_local)
+        x = p1[0] * (1 - u) + p2[0] * u
+        y = p1[1] * (1 - u) + p2[1] * u
+        return {AxisName.ALPHA: _safe(x), AxisName.BETA: _safe(y)}
+
+
+@dataclass
+class PatternP35_PoleEdgeSlide:
+    """Slow linear slide along the edge of one pole (radial in/out + slight angular drift)."""
+    metadata: PatternMetadata = field(default_factory=lambda: PatternMetadata(
+        id="P35", name="Pole Edge Slide", category=PatternCategory.POSITION,
+        axes_used=(AxisName.ALPHA, AxisName.BETA),
+        duration_range_s=(10.0, 50.0),
+        suitable_phases=(PhaseName.PLATEAU, PhaseName.EDGE, PhaseName.CLIMAX),
+        style_affinity={"edging": 1.6, "endlos_tease": 1.5, "sanfter_aufbau": 1.3,
+                        "crescendo": 1.2, "ruin": 1.1, "beat_drop": 0.9},
+    ))
+
+    @staticmethod
+    def render(t_local, slot, master, master_at, rng):
+        # pick a pole at random for this slot
+        pole = (_NEUTRAL_POLE, _LEFT_POLE, _RIGHT_POLE)[int(rng.integers(0, 3))]
+        velocity = float(slot.parameters.get("velocity", 0.15))
+        # Radial in/out: pole-edge to ~70% of pole distance and back
+        cx, cy = pole[0] - 0.5, pole[1] - 0.5
+        pole_r = (cx * cx + cy * cy) ** 0.5
+        pole_angle = np.arctan2(cy, cx)
+        slide_u = 0.5 - 0.5 * np.cos(2 * np.pi * velocity * t_local)  # 0..1
+        r = pole_r * (0.55 + 0.45 * slide_u)
+        # Mild angular wander ±2°
+        ang = pole_angle + np.deg2rad(2.0) * np.sin(2 * np.pi * velocity * 0.7 * t_local)
+        x = 0.5 + r * np.cos(ang)
+        y = 0.5 + r * np.sin(ang)
+        return {AxisName.ALPHA: _safe(x), AxisName.BETA: _safe(y)}
+
+
 # ---------------------------------------------------------------------------
 # Registry export
 # ---------------------------------------------------------------------------
@@ -698,4 +1141,22 @@ POSITION_PATTERNS = {
     "P17": PatternP17_HoldLeft(),
     "P18": PatternP18_HoldRight(),
     "P19": PatternP19_TriadicStepCycle(),
+    # Restim-derived
+    "P20": PatternP20_RestimCircle(),
+    "P21": PatternP21_FigureEight(),
+    "P22": PatternP22_MicroCircles(),
+    "P23": PatternP23_TriPhasePanning(),
+    "P24": PatternP24_VerticalOscillation(),
+    "P25": PatternP25_DeepThrob(),
+    "P26": PatternP26_RoseCurve(),
+    "P27": PatternP27_RandomWalk(),
+    "P28": PatternP28_Spirograph(),
+    "P29": PatternP29_TremorCircle(),
+    "P30": PatternP30_WShape(),
+    # Edge-of-pole micro-targeting
+    "P31": PatternP31_EdgeWobbleNeutral(),
+    "P32": PatternP32_EdgeWobbleLeft(),
+    "P33": PatternP33_EdgeWobbleRight(),
+    "P34": PatternP34_TwoPoleTease(),
+    "P35": PatternP35_PoleEdgeSlide(),
 }
