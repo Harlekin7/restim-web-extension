@@ -375,10 +375,10 @@ class PatternP11_MicroJitter:
         n = len(t_local)
         center = float(slot.parameters.get("center", 0.5))
         amp = float(slot.parameters.get("amp", 0.05 + 0.05 * master.movement))
-        # high-freq dither + small smoothed component
-        noise = perlin_like(t_local, freq_hz=8.0, rng=rng, octaves=3)
+        # very slow noise — 8Hz felt jittery, 0.4Hz reads as gentle drift
+        noise = perlin_like(t_local, freq_hz=0.4, rng=rng, octaves=2)
         a = center + amp * noise
-        b = np.full(n, 0.5) + 0.02 * perlin_like(t_local, freq_hz=4.0, rng=rng, octaves=2)
+        b = np.full(n, 0.5) + 0.02 * perlin_like(t_local, freq_hz=0.3, rng=rng, octaves=2)
         return {AxisName.ALPHA: _safe(a), AxisName.BETA: _safe(b)}
 
 
@@ -522,6 +522,159 @@ class PatternP15_BeatPhaseLock:
 
 
 # ---------------------------------------------------------------------------
+# P16 / P17 / P18 — Hold a single electrode (Neutral / Left / Right pole)
+# ---------------------------------------------------------------------------
+# In Restim's three-phase phase diagram the electrodes sit at 120° apart
+# on the unit circle around (0.5, 0.5). The standard mapping is:
+#   Neutral pole (often glans):   (1.000, 0.500)   — pure +alpha
+#   Left pole:                    (0.250, 0.933)   — 120° CCW
+#   Right pole:                   (0.250, 0.067)   — 120° CW
+# These three patterns *hold* the stim concentrated on one electrode for
+# the duration of the slot, with only a tiny breathing motion so it doesn't
+# read as completely frozen.
+
+_NEUTRAL_POLE = (1.00, 0.50)
+_LEFT_POLE    = (0.25, 0.93)
+_RIGHT_POLE   = (0.25, 0.07)
+
+
+def _hold_pole(t_local: np.ndarray, pole: tuple[float, float],
+               breath_amp: float, breath_hz: float,
+               rng: np.random.Generator) -> tuple[np.ndarray, np.ndarray]:
+    """Hold near a target pole with a slow tangential 'breathing' motion."""
+    cx, cy = pole
+    # Perpendicular breathing: lay it tangential to the radius from the center.
+    # Direction from center (0.5,0.5) to pole:
+    rx, ry = cx - 0.5, cy - 0.5
+    norm = max((rx * rx + ry * ry) ** 0.5, 1e-6)
+    rx, ry = rx / norm, ry / norm
+    # Tangent vector (90° CCW)
+    tx, ty = -ry, rx
+    phase0 = float(rng.uniform(0, 2 * np.pi))
+    breath = breath_amp * np.sin(2 * np.pi * breath_hz * t_local + phase0)
+    a = cx + tx * breath
+    b = cy + ty * breath
+    return _safe(a), _safe(b)
+
+
+@dataclass
+class PatternP16_HoldNeutral:
+    metadata: PatternMetadata = field(default_factory=lambda: PatternMetadata(
+        id="P16",
+        name="Hold Neutral Pole",
+        category=PatternCategory.POSITION,
+        axes_used=(AxisName.ALPHA, AxisName.BETA),
+        duration_range_s=(8.0, 45.0),
+        suitable_phases=(PhaseName.PLATEAU, PhaseName.EDGE, PhaseName.CLIMAX),
+        style_affinity={
+            "edging": 1.7, "endlos_tease": 1.6, "sanfter_aufbau": 1.5,
+            "crescendo": 1.4, "ruin": 1.3, "beat_drop": 1.0,
+        },
+    ))
+
+    @staticmethod
+    def render(t_local, slot, master, master_at, rng):
+        a, b = _hold_pole(t_local, _NEUTRAL_POLE, breath_amp=0.04, breath_hz=0.20, rng=rng)
+        return {AxisName.ALPHA: a, AxisName.BETA: b}
+
+
+@dataclass
+class PatternP17_HoldLeft:
+    metadata: PatternMetadata = field(default_factory=lambda: PatternMetadata(
+        id="P17",
+        name="Hold Left Pole",
+        category=PatternCategory.POSITION,
+        axes_used=(AxisName.ALPHA, AxisName.BETA),
+        duration_range_s=(8.0, 45.0),
+        suitable_phases=(PhaseName.PLATEAU, PhaseName.EDGE, PhaseName.CLIMAX),
+        style_affinity={
+            "edging": 1.7, "endlos_tease": 1.6, "sanfter_aufbau": 1.5,
+            "crescendo": 1.4, "ruin": 1.3, "beat_drop": 1.0,
+        },
+    ))
+
+    @staticmethod
+    def render(t_local, slot, master, master_at, rng):
+        a, b = _hold_pole(t_local, _LEFT_POLE, breath_amp=0.04, breath_hz=0.20, rng=rng)
+        return {AxisName.ALPHA: a, AxisName.BETA: b}
+
+
+@dataclass
+class PatternP18_HoldRight:
+    metadata: PatternMetadata = field(default_factory=lambda: PatternMetadata(
+        id="P18",
+        name="Hold Right Pole",
+        category=PatternCategory.POSITION,
+        axes_used=(AxisName.ALPHA, AxisName.BETA),
+        duration_range_s=(8.0, 45.0),
+        suitable_phases=(PhaseName.PLATEAU, PhaseName.EDGE, PhaseName.CLIMAX),
+        style_affinity={
+            "edging": 1.7, "endlos_tease": 1.6, "sanfter_aufbau": 1.5,
+            "crescendo": 1.4, "ruin": 1.3, "beat_drop": 1.0,
+        },
+    ))
+
+    @staticmethod
+    def render(t_local, slot, master, master_at, rng):
+        a, b = _hold_pole(t_local, _RIGHT_POLE, breath_amp=0.04, breath_hz=0.20, rng=rng)
+        return {AxisName.ALPHA: a, AxisName.BETA: b}
+
+
+# ---------------------------------------------------------------------------
+# P19 — Triadic Step Cycle (slow walk through all three electrode poles)
+# ---------------------------------------------------------------------------
+
+@dataclass
+class PatternP19_TriadicStepCycle:
+    metadata: PatternMetadata = field(default_factory=lambda: PatternMetadata(
+        id="P19",
+        name="Triadic Step Cycle",
+        category=PatternCategory.POSITION,
+        axes_used=(AxisName.ALPHA, AxisName.BETA),
+        duration_range_s=(15.0, 90.0),
+        suitable_phases=(PhaseName.BUILD, PhaseName.PLATEAU, PhaseName.EDGE),
+        style_affinity={
+            "endlos_tease": 1.8, "edging": 1.7, "sanfter_aufbau": 1.6,
+            "crescendo": 1.4, "ruin": 1.2, "beat_drop": 1.1,
+        },
+    ))
+
+    @staticmethod
+    def render(t_local, slot, master, master_at, rng):
+        # Hold each pole for ~6s, smoothly transition over ~2s
+        hold_s = float(slot.parameters.get("hold_s", 6.0))
+        trans_s = float(slot.parameters.get("transition_s", 2.0))
+        order = slot.parameters.get("order", None)
+        poles = [_NEUTRAL_POLE, _LEFT_POLE, _RIGHT_POLE]
+        if order is None:
+            # Random rotation direction so successive slots differ
+            if rng.random() < 0.5:
+                poles = [_NEUTRAL_POLE, _LEFT_POLE, _RIGHT_POLE]
+            else:
+                poles = [_NEUTRAL_POLE, _RIGHT_POLE, _LEFT_POLE]
+
+        cycle_len = hold_s + trans_s
+        a_out = np.empty_like(t_local)
+        b_out = np.empty_like(t_local)
+        for i, t in enumerate(t_local):
+            phase_in_cycle = t % (cycle_len * len(poles))
+            pole_idx = int(phase_in_cycle // cycle_len)
+            local_t = phase_in_cycle - pole_idx * cycle_len
+            cur_pole = poles[pole_idx]
+            next_pole = poles[(pole_idx + 1) % len(poles)]
+            if local_t < hold_s:
+                a_out[i] = cur_pole[0]
+                b_out[i] = cur_pole[1]
+            else:
+                # smooth ease-in-out between cur and next
+                u = (local_t - hold_s) / max(trans_s, 1e-6)
+                u = 0.5 - 0.5 * np.cos(np.pi * u)  # smoothstep
+                a_out[i] = cur_pole[0] * (1 - u) + next_pole[0] * u
+                b_out[i] = cur_pole[1] * (1 - u) + next_pole[1] * u
+        return {AxisName.ALPHA: _safe(a_out), AxisName.BETA: _safe(b_out)}
+
+
+# ---------------------------------------------------------------------------
 # Registry export
 # ---------------------------------------------------------------------------
 
@@ -541,4 +694,8 @@ POSITION_PATTERNS = {
     "P13": PatternP13_BetaBuzzAlphaToggle(),
     "P14": PatternP14_RotationWithDrift(),
     "P15": PatternP15_BeatPhaseLock(),
+    "P16": PatternP16_HoldNeutral(),
+    "P17": PatternP17_HoldLeft(),
+    "P18": PatternP18_HoldRight(),
+    "P19": PatternP19_TriadicStepCycle(),
 }

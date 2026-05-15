@@ -22,13 +22,13 @@ from .types import AxisName
 # Lowered after live feedback that movements felt jittery — these caps
 # determine the "fastest-allowed" slope per sample, not the typical one.
 DEFAULT_SLEW_LIMITS_PER_S: dict[AxisName, float] = {
-    AxisName.ALPHA: 1.5,           # 0->100% in ~660ms — visible rotation, no zappel
-    AxisName.BETA: 1.5,
+    AxisName.ALPHA: 0.5,           # 0->100% in 2s — slow visible motion, no zappy jitter
+    AxisName.BETA: 0.5,
     AxisName.VOLUME: 0.8,          # 0->100% in 1.25s
-    AxisName.CARRIER: 0.6,         # full carrier sweep in ~1.7s
-    AxisName.PULSE_FREQUENCY: 1.0,
-    AxisName.PULSE_WIDTH: 0.8,
-    AxisName.PULSE_RISE_TIME: 1.0,
+    AxisName.CARRIER: 0.4,         # full carrier sweep in 2.5s
+    AxisName.PULSE_FREQUENCY: 0.7,
+    AxisName.PULSE_WIDTH: 0.6,
+    AxisName.PULSE_RISE_TIME: 0.8,
 }
 
 # Onset ramp: first ONSET_RAMP_S seconds of any session, volume is hard-limited to a
