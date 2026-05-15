@@ -123,6 +123,13 @@ class SafetyGuard:
                 onset_cap = self.caps["vol_floor"] * (t_in_session / ONSET_RAMP_S)
                 target = min(target, onset_cap)
 
+            # 4b) User-configured Base Volume floor: after the onset ramp completes,
+            # Volume is never allowed below user_caps.min_volume. Lets the user set a
+            # "always-on baseline" that patterns/edges can't pull through.
+            if (axis == AxisName.VOLUME and not self.state.panic_stop
+                    and t_in_session >= ONSET_RAMP_S):
+                target = max(target, float(self.user_caps.min_volume))
+
             # 5) Slew-rate limit per axis (asymmetric for volume: gentler upward)
             if axis == AxisName.VOLUME and not self.state.panic_stop:
                 max_change_up = DEFAULT_SLEW_LIMITS_PER_S[axis] * self.dt

@@ -320,15 +320,21 @@ h1 { font-size: 18px; color: #5af; font-weight: 500; margin-bottom: 14px; }
       </div>
     </div>
 
-    <!-- 4. Erfahrung -->
+    <!-- 4. Erfahrung & Base Volume -->
     <div class="group">
-      <div class="group-title">Erfahrung</div>
+      <div class="group-title">Erfahrung &amp; Base Volume</div>
       <div class="param-row">
         <span class="param-label">Stufe</span>
         <input type="range" class="param-range" id="ss-exp" min="1" max="5" step="1" value="2">
         <span class="param-val" id="ss-exp-val">2</span>
       </div>
       <div class="exp-display" id="ss-exp-label">Eingewöhnt</div>
+      <div class="param-row" style="margin-top:10px;">
+        <span class="param-label">Base Vol</span>
+        <input type="range" class="param-range" id="ss-min-vol" min="0" max="0.5" step="0.01" value="0">
+        <span class="param-val" id="ss-min-vol-val">0%</span>
+      </div>
+      <div class="exp-display">Volume fällt nie unter diesen Wert</div>
     </div>
 
     <!-- 5. Hardware & Elektroden -->
@@ -480,6 +486,14 @@ h1 { font-size: 18px; color: #5af; font-weight: 500; margin-bottom: 14px; }
         document.getElementById(id).addEventListener('change', notifySessionProfile);
     });
 
+    // Base Volume slider with live percent label
+    const minVolSlider = document.getElementById('ss-min-vol');
+    const minVolLabel = document.getElementById('ss-min-vol-val');
+    minVolSlider.addEventListener('input', () => {
+        minVolLabel.textContent = Math.round(parseFloat(minVolSlider.value) * 100) + '%';
+        notifySessionProfile();
+    });
+
     function getSessionProfile() {
         const electrodes = window.__bodySchema ? window.__bodySchema.get() : [];
         const sizeMap = { small: 4.0, medium: 9.0, large: 16.0 };
@@ -510,6 +524,7 @@ h1 { font-size: 18px; color: #5af; font-weight: 500; margin-bottom: 14px; }
             },
             safety: {
                 max_volume:         parseFloat(document.getElementById('ss-vol-cap').value),
+                min_volume:         parseFloat(document.getElementById('ss-min-vol').value),
                 max_carrier_hz:     parseFloat(document.getElementById('ss-carrier-cap').value),
                 max_pulse_width_us: parseFloat(document.getElementById('ss-pw-cap').value),
                 min_volume_ramp_s:  5.0,

@@ -282,6 +282,7 @@ class SessionBridge:
         safety_raw = d.get("safety", {}) if isinstance(d.get("safety", {}), dict) else {}
         safety = SafetyCaps(
             max_volume=float(safety_raw.get("max_volume", 1.0)),
+            min_volume=float(safety_raw.get("min_volume", 0.0)),
             max_carrier_hz=float(safety_raw.get("max_carrier_hz", 2200.0)),
             max_pulse_width_us=float(safety_raw.get("max_pulse_width_us", 400.0)),
             min_volume_ramp_s=float(safety_raw.get("min_volume_ramp_s", 5.0)),

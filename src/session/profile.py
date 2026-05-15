@@ -116,6 +116,8 @@ CHARACTER_PRESETS: dict[Character, dict] = {
 class SafetyCaps:
     """Hard absolute limits, applied AFTER experience caps. User-overridable in expert tab."""
     max_volume: float = 1.00
+    min_volume: float = 0.0           # Volume floor — patterns/edges can't pull Volume below this.
+                                      # Onset ramp still starts at 0 and ramps up to this floor.
     max_carrier_hz: float = 2200.0
     max_pulse_width_us: float = 400.0
     min_volume_ramp_s: float = 5.0
